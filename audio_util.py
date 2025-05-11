@@ -1,23 +1,23 @@
 import io
 from pydub import AudioSegment
 import numpy as np
-import os
-import stat
+# import os
+# import stat
 
-def ensure_executable(path):
-    try:
-        st = os.stat(path)
-        os.chmod(path, st.st_mode | stat.S_IEXEC)
-    except Exception as e:
-        print(f'실행 권한 부여 실패: {path} - {e}')
+# def ensure_executable(path):
+#     try:
+#         st = os.stat(path)
+#         os.chmod(path, st.st_mode | stat.S_IEXEC)
+#     except Exception as e:
+#         print(f'실행 권한 부여 실패: {path} - {e}')
 
-# ffmpeg, ffprobe 경로를 bin 폴더로 직접 지정
-ffmpeg_path = '../bin/ffmpeg'
-ffprobe_path = '../bin/ffprobe'
-ensure_executable(ffmpeg_path)
-ensure_executable(ffprobe_path)
-AudioSegment.converter = ffmpeg_path
-AudioSegment.ffprobe = ffprobe_path
+# # ffmpeg, ffprobe 경로를 bin 폴더로 직접 지정
+# ffmpeg_path = '../bin/ffmpeg'
+# ffprobe_path = '../bin/ffprobe'
+# ensure_executable(ffmpeg_path)
+# ensure_executable(ffprobe_path)
+# AudioSegment.converter = ffmpeg_path
+# AudioSegment.ffprobe = ffprobe_path
 
 def convert_webm_to_pcm16(webm_data):
     try:
