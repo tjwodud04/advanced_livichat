@@ -2,10 +2,20 @@ import io
 from pydub import AudioSegment
 import numpy as np
 import os
+import stat
+
+def ensure_executable(path):
+    try:
+        st = os.stat(path)
+        os.chmod(path, st.st_mode | stat.S_IEXEC)
+    except Exception as e:
+        print(f'실행 권한 부여 실패: {path} - {e}')
 
 # ffmpeg, ffprobe 경로를 bin 폴더로 직접 지정
 ffmpeg_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'bin', 'ffmpeg')
 ffprobe_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'bin', 'ffprobe')
+ensure_executable(ffmpeg_path)
+ensure_executable(ffprobe_path)
 AudioSegment.converter = ffmpeg_path
 AudioSegment.ffprobe = ffprobe_path
 
