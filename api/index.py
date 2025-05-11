@@ -1,5 +1,5 @@
 # 필요한 모듈 및 라이브러리 임포트
-from flask import Flask, request, send_from_directory, jsonify, render_template  # Flask 웹 프레임워크 관련 기능들 임포트
+from flask import Flask, request, send_from_directory, jsonify, render_template, abort  # Flask 웹 프레임워크 관련 기능들 임포트
 from flask_cors import CORS  # 교차 출처 리소스 공유(CORS) 기능을 제공하는 Flask 확장 임포트
 from openai import OpenAI  # OpenAI API와 상호작용하기 위한 클라이언트 임포트
 from datetime import datetime  # 날짜 및 시간 관련 기능 임포트
@@ -23,14 +23,11 @@ CORS(app)  # CORS 지원 활성화 - 다른 도메인에서의 요청 허용
 BASE_DIR = Path(__file__).resolve().parent  # 현재 파일의 디렉토리 경로 설정
 CONVERSATIONS_FILE = BASE_DIR / "conversations.json"  # 대화 내용을 저장할 파일 경로 설정
 
-# --- OpenAI 클라이언트 생성 함수 (공식 레포지토리 스타일, 명확한 에러 반환) ---
+# OpenAI 클라이언트 생성 함수
 def get_openai_client():
     api_key = request.headers.get("X-API-KEY")
     if not api_key:
-        api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        # 명확한 에러 메시지 반환
-        raise Exception("OpenAI API 키가 없습니다. 웹에서 API 키를 입력하거나 환경변수에 등록하세요.")
+        abort(401, description="OpenAI API 키가 없습니다. 웹에서 반드시 입력해야 합니다.")
     return OpenAI(api_key=api_key)
 
 # --- 멀티턴 대화 이력(최근 3턴) 관리용 (메모리, 유저별 구분 없음) ---
