@@ -99,6 +99,15 @@ class Live2DManager {
             this.setExpression('neutral');  // 표정을 'neutral'로 재설정
         }
     }
+
+    // 립싱크(입모양) 수동 제어 함수 추가
+    updateLipSync(volume) {
+        if (this.model && this.model.internalModel && this.model.internalModel.coreModel) {
+            // volume(0~1) 값에 따라 입모양 파라미터를 조정
+            // Kei/haru 모두 ParamMouthOpenY 사용
+            this.model.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', volume);
+        }
+    }
 }
 
 class AudioManager {
