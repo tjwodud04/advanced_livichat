@@ -23,13 +23,14 @@ CORS(app)  # CORS 지원 활성화 - 다른 도메인에서의 요청 허용
 BASE_DIR = Path(__file__).resolve().parent  # 현재 파일의 디렉토리 경로 설정
 CONVERSATIONS_FILE = BASE_DIR / "conversations.json"  # 대화 내용을 저장할 파일 경로 설정
 
-# --- OpenAI 클라이언트 생성 함수 (헤더 우선, 없으면 환경변수) ---
+# --- OpenAI 클라이언트 생성 함수 (공식 레포지토리 스타일, 명확한 에러 반환) ---
 def get_openai_client():
     api_key = request.headers.get("X-API-KEY")
     if not api_key:
         api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise Exception("OpenAI API 키가 없습니다.")
+        # 명확한 에러 메시지 반환
+        raise Exception("OpenAI API 키가 없습니다. 웹에서 API 키를 입력하거나 환경변수에 등록하세요.")
     return OpenAI(api_key=api_key)
 
 # --- 멀티턴 대화 이력(최근 3턴) 관리용 (메모리, 유저별 구분 없음) ---
