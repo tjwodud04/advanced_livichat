@@ -27,7 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiKeyInput = document.getElementById('apiKeyInput');
 
     // 저장된 API 키가 있는지 확인
-    const savedApiKey = localStorage.getItem('openai_api_key');
+    function getSavedApiKey() {
+        return localStorage.getItem('openai_api_key');
+    }
+    function setSavedApiKey(key) {
+        localStorage.setItem('openai_api_key', key);
+    }
+    let savedApiKey = getSavedApiKey();
     if (savedApiKey) {
         setApiKeyBtn.textContent = 'API 키 변경';
     }
@@ -35,8 +41,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 모달 열기
     setApiKeyBtn.addEventListener('click', function() {
         modal.style.display = 'block';
+        savedApiKey = getSavedApiKey();
         if (savedApiKey) {
             apiKeyInput.value = savedApiKey;
+        } else {
+            apiKeyInput.value = '';
         }
     });
 
@@ -49,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
     saveApiKey.addEventListener('click', function() {
         const apiKey = apiKeyInput.value.trim();
         if (apiKey && apiKey.startsWith('sk-')) {
-            localStorage.setItem('openai_api_key', apiKey);
+            setSavedApiKey(apiKey);
             setApiKeyBtn.textContent = 'API 키 변경';
             modal.style.display = 'none';
         } else {
@@ -68,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const characterLinks = document.querySelectorAll('.card:not(.disabled)');
     characterLinks.forEach(link => {
         link.addEventListener('click', function(event) {
-            if (!localStorage.getItem('openai_api_key')) {
+            if (!getSavedApiKey()) {
                 event.preventDefault();
                 alert('대화를 시작하기 전에 OpenAI API 키를 설정해주세요.');
                 modal.style.display = 'block';
