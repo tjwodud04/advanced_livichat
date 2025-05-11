@@ -11,6 +11,8 @@ import tempfile  # 임시 파일 및 디렉토리 생성을 위한 모듈 임포
 import base64  # 바이너리 데이터의 인코딩 및 디코딩을 위한 모듈 임포트
 import json  # JSON 데이터 처리를 위한 모듈 임포트
 import threading  # 멀티턴 대화 이력 관리를 위한 Lock
+import websockets  # WebSocket 연결용
+import asyncio
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__, 
@@ -137,61 +139,44 @@ def save_conversation(user_input: str, ai_response: str):
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        # 오디오 파일이 요청에 포함되어 있는지 확인
         if 'audio' not in request.files:
-            return jsonify({"error": "No audio file provided"}), 400  # 오디오 파일이 없으면 400 오류 반환
+            return jsonify({"error": "No audio file provided"}), 400
 
-        # 요청에서 오디오 파일과 캐릭터 정보 추출
-        audio_file = request.files['audio']  # 오디오 파일 가져오기
-        character = request.form.get('character', 'kei')  # 캐릭터 정보 가져오기, 기본값은 'kei'
-        
-        # 파일 정보 로깅
-        print(f"Received file: {audio_file.filename}")  # 받은 파일 이름 출력
-        print(f"Content Type: {audio_file.content_type}")  # 파일 콘텐츠 타입 출력
-        print(f"Character: {character}")  # 캐릭터 정보 출력
+        api_key = request.headers.get('X-API-KEY')
+        if not api_key:
+            return jsonify({"error": "API key is required"}), 401
 
-        # 임시 파일 생성
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:  # 임시 WAV 파일 생성, 자동 삭제하지 않음
-            # 파일 저장 전 크기 확인
-            audio_file.seek(0, 2)  # 파일 포인터를 끝으로 이동
-            file_size = audio_file.tell()  # 현재 파일 포인터 위치(파일 크기) 확인
-            audio_file.seek(0)  # 파일 포인터를 다시 처음으로 이동
-            print(f"File size before saving: {file_size} bytes")  # 저장 전 파일 크기 출력
-            
-            # 파일 저장
-            audio_file.save(temp_file)  # 오디오 파일을 임시 파일로 저장
-            temp_file_path = temp_file.name  # 임시 파일 경로 저장
-            
-            # 저장된 파일 크기 확인
-            saved_size = os.path.getsize(temp_file_path)  # 저장된 파일의 크기 확인
-            print(f"Saved file size: {saved_size} bytes")  # 저장된 파일 크기 출력
-            print(f"Temp file path: {temp_file_path}")  # 임시 파일 경로 출력
+        audio_file = request.files['audio']
+        character = request.form.get('character', 'kei')
+
+        # 임시 파일 저장
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+            audio_file.save(temp_file)
+            temp_file_path = temp_file.name
 
         try:
-            # Whisper API로 음성을 텍스트로 변환
-            with open(temp_file_path, 'rb') as audio:  # 임시 파일을 바이너리 읽기 모드로 열기
-                print("Sending file to Whisper API")  # Whisper API로 파일 전송 중임을 로그로 출력
-                client = get_openai_client()
+            # 1. Whisper 전사
+            client = get_openai_client()
+            with open(temp_file_path, 'rb') as audio:
                 transcription = client.audio.transcriptions.create(
                     model="whisper-1",
                     file=audio,
                     response_format="text"
                 )
-                print(f"Transcription received: {transcription}")  # 받은 텍스트 변환 결과 출력
+            user_text = transcription
 
-            user_text = transcription  # 변환된 텍스트를 사용자 텍스트로 설정
-            
-            # --- 7정 감정 분석 ---
+            # 2. 감정 분석
             emotion_percent, top_emotion = analyze_emotion(user_text)
             emotion_str = ', '.join([f"{k} {v}%" for k, v in emotion_percent.items()])
 
-            # --- 멀티턴 대화 이력 업데이트 (최근 3턴만 유지) ---
+            # 3. 최근 3턴 대화 이력 준비
             with history_lock:
                 conversation_history.append({"role": "user", "content": user_text})
-                if len(conversation_history) > 6:  # user/assistant 3턴씩
+                if len(conversation_history) > 6:
                     conversation_history.pop(0)
+                history_copy = conversation_history.copy()
 
-            # --- system_message 생성 및 감정 정보 추가 ---
+            # 4. system prompt 생성 (감정 정보 포함)
             system_messages = {
                 'kei': "당신은 창의적이고 현대적인 감각을 지닌 캐릭터로, 독특한 은발과 에메랄드빛 눈동자가 특징입니다. 사용자의 이야기에서 감정을 파악하고, 이 감정에 공감 기반이되 실용적인 관점을 놓치지 않고, 따뜻하고 세련된 톤으로 2문장 이내의 답변을 제공해주세요.",
                 'haru': "당신은 비즈니스 환경에서 일하는 전문적이고 자신감 있는 여성 캐릭터입니다. 사용자의 이야기에서 감정을 파악하고, 이 감정에 공감하면서도 실용적인 관점에서 명확하고 간단한 해결책을 2문장 이내로 제시해주세요.",
@@ -199,55 +184,87 @@ def chat():
             system_message = system_messages.get(character, system_messages['kei'])
             system_message += f"\n\n[7정 감정 분석 결과] {emotion_str}.\n가장 높은 감정({top_emotion})에 공감하여 답변해 주세요."
 
-            # --- messages 배열 구성 (system + 이력 + 이번 발화) ---
-            with history_lock:
-                messages = [{"role": "system", "content": system_message}] + conversation_history.copy()
+            # 5. WebSocket 기반 Realtime API 호출 (비동기 함수 실행)
+            async def call_realtime_api(audio_path, system_message, history, api_key):
+                import base64
+                import json
+                from pydub import AudioSegment
+                import io
+                # 오디오 변환 (pcm16, 24kHz, mono)
+                audio = AudioSegment.from_file(audio_path)
+                pcm_audio = audio.set_frame_rate(24000).set_channels(1).set_sample_width(2).raw_data
+                pcm_base64 = base64.b64encode(pcm_audio).decode()
+                url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "OpenAI-Beta": "realtime=v1"
+                }
+                async with websockets.connect(url, extra_headers=headers) as ws:
+                    # 1) 세션 설정
+                    await ws.send(json.dumps({
+                        "type": "session.update",
+                        "session": {
+                            "modalities": ["audio", "text"],
+                            "instructions": system_message,
+                            "voice": "alloy",
+                            "input_audio_format": "pcm16",
+                            "output_audio_format": "pcm16",
+                            "input_audio_transcription": {"model": "whisper-1", "language": "ko"}
+                        }
+                    }))
+                    # 2) 대화 이력 추가
+                    for msg in history:
+                        await ws.send(json.dumps({
+                            "type": "conversation.item.create",
+                            "item": {
+                                "type": "message",
+                                "role": msg["role"],
+                                "content": [{"type": "input_text", "text": msg["content"]}]
+                            }
+                        }))
+                    # 3) 오디오 전송
+                    await ws.send(json.dumps({
+                        "type": "input_audio_buffer.append",
+                        "audio": pcm_base64
+                    }))
+                    await ws.send(json.dumps({"type": "input_audio_buffer.commit"}))
+                    await ws.send(json.dumps({"type": "response.create", "response": {"modalities": ["audio", "text"]}}))
+                    # 4) 응답 수신
+                    ai_text, ai_audio = "", b""
+                    async for message in ws:
+                        event = json.loads(message)
+                        if event["type"] == "response.audio_transcript.delta":
+                            ai_text += event["delta"]
+                        if event["type"] == "response.audio.delta":
+                            ai_audio += base64.b64decode(event["delta"])
+                        if event["type"] == "response.audio.done":
+                            break
+                    return ai_text, ai_audio
+            # 비동기 함수 실행
+            ai_text, ai_audio = asyncio.run(call_realtime_api(temp_file_path, system_message, history_copy, api_key))
 
-            # gpt-4o 응답 생성
-            client = get_openai_client()
-            chat_response = client.chat.completions.create(
-                model="gpt-4o-realtime-preview",
-                modalities=["text", "audio"],
-                audio={
-                    "voice": "alloy",
-                    "format": "wav"
-                },
-                messages=messages
-            )
-
-            # 응답 구조 확인 및 처리
-            response_message = chat_response.choices[0].message
-            ai_text = response_message.audio.transcript if response_message.audio else None
-            audio_base64 = None
-            if hasattr(response_message, 'audio') and response_message.audio:
-                audio_base64 = response_message.audio.data
-
-            # --- 대화 이력에 assistant 답변 추가 ---
+            # 대화 이력에 assistant 답변 추가
             with history_lock:
                 conversation_history.append({"role": "assistant", "content": ai_text})
                 if len(conversation_history) > 6:
                     conversation_history.pop(0)
 
-            print(f"AI response generated: {ai_text}")
+            # 응답 반환 (오디오 base64 인코딩)
+            audio_base64 = base64.b64encode(ai_audio).decode() if ai_audio else None
             return jsonify({
                 "user_text": user_text,
                 "ai_text": ai_text,
                 "audio": audio_base64,
-                "emotion_percent": emotion_percent,  # 프론트엔드 Live2D 확장 활용
+                "emotion_percent": emotion_percent,
                 "top_emotion": top_emotion
             })
-
         finally:
-            # 임시 파일 삭제 - 항상 실행되도록 finally 블록에 배치
             try:
-                os.unlink(temp_file_path)  # 임시 파일 삭제
-                print(f"Temporary file deleted: {temp_file_path}")  # 임시 파일 삭제 확인 로그
+                os.unlink(temp_file_path)
             except Exception as e:
-                print(f"Warning: Failed to delete temporary file: {e}")  # 삭제 실패 시 경고 메시지 출력
-
+                print(f"임시 파일 삭제 실패: {e}")
     except Exception as e:
-        # 예외 처리
-        print(f"Error in chat endpoint: {str(e)}")  # 오류 메시지 출력
-        import traceback  # 스택 트레이스 모듈 임포트
-        traceback.print_exc()  # 스택 트레이스 출력(디버깅용)
-        return jsonify({"error": str(e)}), 500  # 500 오류 반환, 오류 메시지 포함
+        print(f"Error in chat endpoint: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
