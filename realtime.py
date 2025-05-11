@@ -90,14 +90,6 @@ def serve_static(path):
 def serve_model(path):
     return send_from_directory('model', path)
 
-def convert_to_pcm16(audio_data):
-    # webm 오디오를 PCM16 형식으로 변환
-    audio = AudioSegment.from_file(io.BytesIO(audio_data), format="webm")
-    # 24kHz, 모노로 변환
-    audio = audio.set_frame_rate(24000).set_channels(1)
-    # PCM16 형식으로 추출
-    return audio.raw_data
-
 
 async def process_audio_with_realtime(audio_file_path, character='momose', client=None):
     try:

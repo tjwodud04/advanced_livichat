@@ -41,5 +41,6 @@
       "src": "/(.*)",
       "dest": "/front/$1"
     }
-  ]
+  ],
+  "postbuild": "chmod +x bin/ffmpeg bin/ffprobe"
 }
