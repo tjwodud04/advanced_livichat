@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime Chat</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <button onclick="location.href='index.html'" class="back-button">←</button>
+    <h1 class="page-title">Realtime Chat</h1>
+
+    <div class="realtime-container">
+        <div class="realtime-character-container">
+            <canvas id="live2d-canvas" class="realtime-canvas"></canvas>
+        </div>
+        <div class="realtime-controls">
+            <button id="recordButton" class="record-button">이야기하기</button>
+        </div>
+    </div>
+
+    <!-- Live2D 관련 라이브러리 -->
+    <script src="/js/live2dcubismcore.min.js"></script>
+    <script src="/js/pixi.min.js"></script>
+    <script src="/js/live2d.min.js"></script>
+    <script src="/js/cubism4.min.js"></script>
+
+    <!-- 유틸리티 라이브러리 -->
+    <script src="/js/jquery-3.1.1.min.js"></script>
+    <script src="/js/axios.min.js"></script>
+
+    <!-- 메인 애플리케이션 코드 -->
+    <script src="/js/realtime.js"></script>
+</body>
+</html>

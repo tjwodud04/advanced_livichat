@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 캐릭터와 대화하기</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <div class="main-container">
+        <h1 class="title">당신의 AI와 대화하기</h1>
+        <p class="subtitle">대화하고 싶은 캐릭터를 선택해주세요</p>
+        <div class="api-key-section">
+            <button id="setApiKeyBtn" class="api-key-btn">OpenAI API 키 설정</button>
+        </div>
+        <div class="card-container">
+            <a href="kei.html" class="card">
+                <div class="card-profile">
+                    <img src="/model/kei/100px_profile.jpg" alt="Kei 프로필">
+                </div>
+                <div class="card-content">
+                    <h2>Kei와 대화하기</h2>
+                    <p>창의적이고 현대적인 감각의 실용적인 스타일의 캐릭터</p>
+                </div>
+            </a>
+            <a href="haru.html" class="card">
+                <div class="card-profile">
+                    <img src="/model/haru/100px_profile.jpg" alt="Haru 프로필">
+                </div>
+                <div class="card-content">
+                    <h2>Haru와 대화하기</h2>
+                    <p>전문적이고 자신감 있는 비즈니스 전문가 스타일의 캐릭터</p>
+                </div>
+            </a>
+            <a href="realtime.html" class="card disabled">
+                <div class="coming-soon-overlay">
+                    <span>준비중</span>
+                </div>
+                <div class="card-profile">
+                    <img src="/model/momose/100px_profile.jpg" alt="Realtime 프로필">
+                </div>
+                <div class="card-content">
+                    <h2>Realtime 체험하기</h2>
+                    <p>실시간 음성 대화 시스템을 체험해보세요.</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- API 키 입력 모달 -->
+    <div id="apiKeyModal" class="modal">
+        <div class="modal-content">
+            <h2>OpenAI API 키 설정</h2>
+            <p>대화를 시작하기 위해 OpenAI API 키를 입력해주세요.</p>
+            <input type="password" id="apiKeyInput" placeholder="sk-..." class="api-key-input">
+            <div class="modal-buttons">
+                <button id="saveApiKey" class="primary-btn">저장</button>
+                <button id="closeModal" class="secondary-btn">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kei와 대화하기</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+    <button onclick="location.href='index.html'" class="back-button">←</button>
+    <h1 class="page-title">Kei와 대화하기</h1>
+
+    <div class="container">
+        <div class="left-panel">
+            <canvas id="live2d-canvas"></canvas>
+        </div>
+        <div class="right-panel">
+            <div class="chat-container">
+                <div class="chat-history" id="chatHistory"></div>
+                <div class="controls">
+                    <button id="recordButton" class="record-button">이야기하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live2D 관련 라이브러리 -->
+    <script src="/js/live2dcubismcore.min.js"></script>
+    <script src="/js/pixi.min.js"></script>
+    <script src="/js/live2d.min.js"></script>
+    <script src="/js/cubism4.min.js"></script>
+
+    <!-- 유틸리티 라이브러리 -->
+    <script src="/js/jquery-3.1.1.min.js"></script>
+    <script src="/js/axios.min.js"></script>
+
+    <!-- 메인 애플리케이션 코드 -->
+    <script src="/js/chat.js"></script>
+</body>
+</html>

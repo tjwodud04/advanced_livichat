@@ -1,0 +1,289 @@
+{
+	"Version": 3,
+	"Parameters": [
+		{
+			"Id": "ParamAngleX",
+			"GroupId": "ParamGroup5",
+			"Name": "각도 X"
+		},
+		{
+			"Id": "ParamAngleY",
+			"GroupId": "ParamGroup5",
+			"Name": "각도 Y"
+		},
+		{
+			"Id": "ParamAngleZ",
+			"GroupId": "ParamGroup5",
+			"Name": "각도 Z"
+		},
+		{
+			"Id": "ParamCheek",
+			"GroupId": "ParamGroup5",
+			"Name": "쑥스러움"
+		},
+		{
+			"Id": "ParamBodyAngleX",
+			"GroupId": "ParamGroup6",
+			"Name": "몸의 회전 X"
+		},
+		{
+			"Id": "ParamBodyAngleY",
+			"GroupId": "ParamGroup6",
+			"Name": "몸의 회전 Y"
+		},
+		{
+			"Id": "ParamBodyAngleZ",
+			"GroupId": "ParamGroup6",
+			"Name": "몸의 회전 Z"
+		},
+		{
+			"Id": "ParamBreath",
+			"GroupId": "ParamGroup6",
+			"Name": "호흡"
+		},
+		{
+			"Id": "ParamBrowLY",
+			"GroupId": "ParamGroup4",
+			"Name": "왼쪽 눈썹 상하"
+		},
+		{
+			"Id": "ParamBrowRY",
+			"GroupId": "ParamGroup4",
+			"Name": "오른쪽 눈썹 상하"
+		},
+		{
+			"Id": "ParamBrowLForm",
+			"GroupId": "ParamGroup4",
+			"Name": "왼쪽 눈썹 변형"
+		},
+		{
+			"Id": "ParamBrowRForm",
+			"GroupId": "ParamGroup4",
+			"Name": "오른쪽 눈썹 변형"
+		},
+		{
+			"Id": "ParamEyeLOpen",
+			"GroupId": "ParamGroup2",
+			"Name": "왼쪽 눈 뜨기"
+		},
+		{
+			"Id": "ParamEyeLSmile",
+			"GroupId": "ParamGroup2",
+			"Name": "왼쪽 눈 웃는 얼굴"
+		},
+		{
+			"Id": "ParamEyeROpen",
+			"GroupId": "ParamGroup2",
+			"Name": "오른쪽 눈 뜨기"
+		},
+		{
+			"Id": "ParamEyeRSmile",
+			"GroupId": "ParamGroup2",
+			"Name": "오른쪽 눈 웃는 얼굴"
+		},
+		{
+			"Id": "ParamEyeBallX",
+			"GroupId": "ParamGroup3",
+			"Name": "눈알 X"
+		},
+		{
+			"Id": "ParamEyeBallY",
+			"GroupId": "ParamGroup3",
+			"Name": "눈알 Y"
+		},
+		{
+			"Id": "ParamMouthOpenY",
+			"GroupId": "ParamGroup10",
+			"Name": "입 개폐"
+		},
+		{
+			"Id": "ParamA",
+			"GroupId": "ParamGroup10",
+			"Name": "A"
+		},
+		{
+			"Id": "ParamI",
+			"GroupId": "ParamGroup10",
+			"Name": "I"
+		},
+		{
+			"Id": "ParamU",
+			"GroupId": "ParamGroup10",
+			"Name": "U"
+		},
+		{
+			"Id": "ParamE",
+			"GroupId": "ParamGroup10",
+			"Name": "E"
+		},
+		{
+			"Id": "ParamO",
+			"GroupId": "ParamGroup10",
+			"Name": "O"
+		},
+		{
+			"Id": "ParamHairFront",
+			"GroupId": "ParamGroup7",
+			"Name": "머리 흔들림 앞"
+		},
+		{
+			"Id": "ParamHairSide",
+			"GroupId": "ParamGroup7",
+			"Name": "머리 흔들림 왼쪽 옆머리"
+		},
+		{
+			"Id": "ParamHairSide2",
+			"GroupId": "ParamGroup7",
+			"Name": "머리 흔들림 오른쪽 가로"
+		},
+		{
+			"Id": "ParamHairBack",
+			"GroupId": "ParamGroup7",
+			"Name": "머리 흔들림 뒤"
+		},
+		{
+			"Id": "ParamHairFrontFuwa",
+			"GroupId": "ParamGroup7",
+			"Name": "머리 볼륨 앞"
+		},
+		{
+			"Id": "ParamHairSideFuwa",
+			"GroupId": "ParamGroup7",
+			"Name": "머리 볼륨 옆"
+		},
+		{
+			"Id": "ParamHairBackFuwa",
+			"GroupId": "ParamGroup7",
+			"Name": "머리 볼륨 뒷"
+		}
+	],
+	"ParameterGroups": [
+		{
+			"Id": "ParamGroup5",
+			"GroupId": "",
+			"Name": "얼굴"
+		},
+		{
+			"Id": "ParamGroup6",
+			"GroupId": "",
+			"Name": "몸"
+		},
+		{
+			"Id": "ParamGroup4",
+			"GroupId": "",
+			"Name": "눈썹"
+		},
+		{
+			"Id": "ParamGroup2",
+			"GroupId": "",
+			"Name": "눈"
+		},
+		{
+			"Id": "ParamGroup3",
+			"GroupId": "",
+			"Name": "눈알"
+		},
+		{
+			"Id": "ParamGroup10",
+			"GroupId": "",
+			"Name": "입 모음만"
+		},
+		{
+			"Id": "ParamGroup7",
+			"GroupId": "",
+			"Name": "흔들림"
+		}
+	],
+	"Parts": [
+		{
+			"Id": "Part15",
+			"Name": "코어"
+		},
+		{
+			"Id": "Part",
+			"Name": "왼쪽 옆머리"
+		},
+		{
+			"Id": "Part2",
+			"Name": "오른쪽 옆머리"
+		},
+		{
+			"Id": "Part3",
+			"Name": "앞머리"
+		},
+		{
+			"Id": "Part4",
+			"Name": "왼쪽 눈썹"
+		},
+		{
+			"Id": "Part5",
+			"Name": "오른쪽 눈썹"
+		},
+		{
+			"Id": "Part22",
+			"Name": "왼쪽 눈"
+		},
+		{
+			"Id": "Part7",
+			"Name": "오른쪽 눈"
+		},
+		{
+			"Id": "Part6",
+			"Name": "뺨"
+		},
+		{
+			"Id": "Part9",
+			"Name": "코"
+		},
+		{
+			"Id": "Part18",
+			"Name": "입 모음만"
+		},
+		{
+			"Id": "Part10",
+			"Name": "얼굴"
+		},
+		{
+			"Id": "Part11",
+			"Name": "왼쪽 귀"
+		},
+		{
+			"Id": "Part12",
+			"Name": "오른쪽 귀"
+		},
+		{
+			"Id": "Part14",
+			"Name": "목"
+		},
+		{
+			"Id": "Part16",
+			"Name": "몸"
+		},
+		{
+			"Id": "Part17",
+			"Name": "뒷머리"
+		},
+		{
+			"Id": "PartSketch0",
+			"Name": "[밑그림]"
+		},
+		{
+			"Id": "Part23",
+			"Name": "왼쪽 눈알"
+		},
+		{
+			"Id": "Part21",
+			"Name": "오른쪽 눈알"
+		}
+	],
+	"CombinedParameters": [
+		[
+			"ParamAngleX",
+			"ParamAngleY"
+		],
+		[
+			"ParamEyeBallX",
+			"ParamEyeBallY"
+		]
+	]
+}
