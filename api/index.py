@@ -6,14 +6,12 @@ from datetime import datetime  # 날짜 및 시간 관련 기능 임포트
 from pathlib import Path  # 파일 경로 관리를 위한 클래스 임포트
 
 import os  # 운영체제와 상호작용하기 위한 모듈 임포트
-import uuid  # 고유 식별자 생성을 위한 모듈 임포트
 import tempfile  # 임시 파일 및 디렉토리 생성을 위한 모듈 임포트
 import base64  # 바이너리 데이터의 인코딩 및 디코딩을 위한 모듈 임포트
 import json  # JSON 데이터 처리를 위한 모듈 임포트
 import threading  # 멀티턴 대화 이력 관리를 위한 Lock
 import websockets  # WebSocket 연결용
 import asyncio
-import mimetypes
 from pydub import AudioSegment
 from audio_util import convert_audio_with_ffmpeg, get_audio_info_with_ffprobe
 
@@ -27,6 +25,12 @@ CORS(app)  # CORS 지원 활성화 - 다른 도메인에서의 요청 허용
 # 기본 경로 설정
 BASE_DIR = Path(__file__).resolve().parent  # 현재 파일의 디렉토리 경로 설정
 CONVERSATIONS_FILE = BASE_DIR / "conversations.json"  # 대화 내용을 저장할 파일 경로 설정
+
+ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../bin/ffmpeg')
+ffprobe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '../bin/ffprobe')
+
+AudioSegment.converter = ffmpeg_path
+AudioSegment.ffprobe = ffprobe_path
 
 # OpenAI 클라이언트 생성 함수
 def get_openai_client():
