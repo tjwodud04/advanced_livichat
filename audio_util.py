@@ -4,6 +4,12 @@ import numpy as np
 import subprocess
 import os
 
+ffmpeg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bin', 'ffmpeg')
+ffprobe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bin', 'ffprobe')
+
+AudioSegment.converter = ffmpeg_path
+AudioSegment.ffprobe = ffprobe_path
+
 def convert_webm_to_pcm16(webm_data):
     try:
         # WebM 데이터를 AudioSegment로 로드
