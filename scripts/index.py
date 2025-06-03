@@ -28,6 +28,11 @@ BASE_DIR = Path(__file__).resolve().parent  # 현재 파일의 디렉토리 경�
 CONVERSATIONS_FILE = BASE_DIR / "conversations.json"  # 대화 내용을 저장할 파일 경로 설정
 
 # static_ffmpeg.add_paths(download_dir="/tmp/static_ffmpeg")
+ffmpeg_path = str(BASE_DIR / "bin" / "ffmpeg")
+ffprobe_path = str(BASE_DIR / "bin" / "ffprobe")
+
+AudioSegment.converter = ffmpeg_path
+AudioSegment.ffprobe = ffprobe_path
 
 # OpenAI 클라이언트 생성 함수
 def get_openai_client():
@@ -91,9 +96,9 @@ def kei():
     return render_template('kei.html')  # kei.html 템플릿 렌더링
 
 # 'realtime' 페이지 경로 핸들러
-@app.route('/realtime')
-def realtime():
-    return render_template('realtime.html')  # realtime.html 템플릿 렌더링
+# @app.route('/realtime')
+# def realtime():
+#     return render_template('realtime.html')  # realtime.html 템플릿 렌더링
 
 # 모델 파일 제공 경로 핸들러
 @app.route('/model/<path:filename>')

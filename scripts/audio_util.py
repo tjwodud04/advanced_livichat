@@ -1,17 +1,20 @@
 import io
 from pydub import AudioSegment
+from pathlib import Path
 import numpy as np
 import subprocess
-import os
 # import static_ffmpeg
 
 # static_ffmpeg.add_paths(download_dir="/tmp/static_ffmpeg")
 # ffmpeg_path = static_ffmpeg.get_ffmpeg_path()
 # ffprobe_path = static_ffmpeg.get_ffprobe_path()
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ffmpeg_path = os.path.join(BASE_DIR, 'bin', 'ffmpeg')
-ffprobe_path = os.path.join(BASE_DIR, 'bin', 'ffprobe')
+base_dir = Path(__file__).resolve().parent
+ffmpeg_path = str(base_dir / "bin" / "ffmpeg")
+ffprobe_path = str(base_dir / "bin" / "ffprobe")
+
+AudioSegment.converter = ffmpeg_path
+AudioSegment.ffprobe = ffprobe_path
 
 def convert_webm_to_pcm16(webm_data):
     try:
