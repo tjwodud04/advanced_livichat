@@ -3,6 +3,9 @@ from pydub import AudioSegment
 import numpy as np
 import subprocess
 import os
+import static_ffmpeg
+
+static_ffmpeg.add_paths()
 
 def convert_webm_to_pcm16(webm_data):
     try:
@@ -28,17 +31,12 @@ def convert_webm_to_pcm16(webm_data):
         print(f"Audio conversion error: {str(e)}")
         return None
 
-def get_ffmpeg_path():
-    # Vercel 환경에서는 프로젝트 루트 기준 상대경로 사용
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bin', 'ffmpeg')
-
 def convert_audio_with_ffmpeg(input_path, output_path):
-    ffmpeg_path = get_ffmpeg_path()
     command = [
-        ffmpeg_path,
+        'ffmpeg',
         '-i', input_path,
-        '-ar', '24000',  # 샘플레이트 24kHz
-        '-ac', '1',      # 모노
+        '-ar', '24000',
+        '-ac', '1',
         '-f', 'wav',
         output_path
     ]
@@ -48,14 +46,9 @@ def convert_audio_with_ffmpeg(input_path, output_path):
         return False
     return True
 
-def get_ffprobe_path():
-    # Vercel 환경에서는 프로젝트 루트 기준 상대경로 사용
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'bin', 'ffprobe')
-
 def get_audio_info_with_ffprobe(input_path):
-    ffprobe_path = get_ffprobe_path()
     command = [
-        ffprobe_path,
+        'ffprobe',
         '-v', 'error',
         '-show_entries', 'format=duration',
         '-of', 'default=noprint_wrappers=1:nokey=1',
