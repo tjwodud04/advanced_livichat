@@ -15,6 +15,10 @@
     {
       "src": "model/**",
       "use": "@vercel/static"
+    },
+    {
+      "src": "api/convert.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -40,6 +44,10 @@
     {
       "src": "/(.*)",
       "dest": "/front/$1"
+    },
+    {
+      "src": "/api/convert",
+      "dest": "api/convert.js"
     }
   ]
 }

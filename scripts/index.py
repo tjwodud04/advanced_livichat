@@ -12,9 +12,6 @@ import json  # JSON 데이터 처리를 위한 모듈 임포트
 import threading  # 멀티턴 대화 이력 관리를 위한 Lock
 import websockets  # WebSocket 연결용
 import asyncio
-from pydub import AudioSegment
-from audio_util import convert_audio_with_ffmpeg, get_audio_info_with_ffprobe
-# import static_ffmpeg
 
 # Flask 애플리케이션 초기화
 app = Flask(__name__, 
@@ -26,13 +23,6 @@ CORS(app)  # CORS 지원 활성화 - 다른 도메인에서의 요청 허용
 # 기본 경로 설정
 BASE_DIR = Path(__file__).resolve().parent  # 현재 파일의 디렉토리 경로 설정
 CONVERSATIONS_FILE = BASE_DIR / "conversations.json"  # 대화 내용을 저장할 파일 경로 설정
-
-# static_ffmpeg.add_paths(download_dir="/tmp/static_ffmpeg")
-ffmpeg_path = str(BASE_DIR / "bin" / "ffmpeg")
-ffprobe_path = str(BASE_DIR / "bin" / "ffprobe")
-
-AudioSegment.converter = ffmpeg_path
-AudioSegment.ffprobe = ffprobe_path
 
 # OpenAI 클라이언트 생성 함수
 def get_openai_client():
@@ -94,11 +84,6 @@ def haru():
 @app.route('/kei')
 def kei():
     return render_template('kei.html')  # kei.html 템플릿 렌더링
-
-# 'realtime' 페이지 경로 핸들러
-# @app.route('/realtime')
-# def realtime():
-#     return render_template('realtime.html')  # realtime.html 템플릿 렌더링
 
 # 모델 파일 제공 경로 핸들러
 @app.route('/model/<path:filename>')
@@ -198,9 +183,13 @@ def chat():
                 import base64
                 import json
                 import io
-                # 오디오 변환 (pcm16, 24kHz, mono)
-                audio = AudioSegment.from_file(audio_path)
-                pcm_audio = audio.set_frame_rate(24000).set_channels(1).set_sample_width(2).raw_data
+                import requests
+                # 오디오 변환 (pcm16, 24kHz, mono) - Node.js 변환 API 호출
+                with open(audio_path, 'rb') as f:
+                    BASE_URL = os.environ.get('CONVERT_API_BASE', 'https://advanced-livichat.vercel.app/')
+                    resp = requests.post(f'{BASE_URL}/api/convert', data=f)
+                    resp.raise_for_status()
+                    pcm_audio = resp.content
                 pcm_base64 = base64.b64encode(pcm_audio).decode()
                 url = "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview"
                 headers = {
@@ -276,39 +265,3 @@ def chat():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-@app.route('/scripts/convert', methods=['POST'])
-def convert():
-    if 'audio' not in request.files:
-        return jsonify({"error": "No audio file provided"}), 400
-
-    audio_file = request.files['audio']
-    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False, dir='/tmp') as temp_in, \
-         tempfile.NamedTemporaryFile(suffix='.wav', delete=False, dir='/tmp') as temp_out:
-        audio_file.save(temp_in)
-        temp_in_path = temp_in.name
-        temp_out_path = temp_out.name
-
-    # ffmpeg로 변환
-    success = convert_audio_with_ffmpeg(temp_in_path, temp_out_path)
-    if not success:
-        return jsonify({"error": "ffmpeg 변환 실패"}), 500
-
-    # 변환된 파일 반환
-    return send_from_directory(os.path.dirname(temp_out_path), os.path.basename(temp_out_path), as_attachment=True)
-
-@app.route('/scripts/audio-info', methods=['POST'])
-def audio_info():
-    if 'audio' not in request.files:
-        return jsonify({"error": "No audio file provided"}), 400
-
-    audio_file = request.files['audio']
-    with tempfile.NamedTemporaryFile(suffix='.webm', delete=False, dir='/tmp') as temp_in:
-        audio_file.save(temp_in)
-        temp_in_path = temp_in.name
-
-    info = get_audio_info_with_ffprobe(temp_in_path)
-    if info is None:
-        return jsonify({"error": "ffprobe 분석 실패"}), 500
-
-    return jsonify(info)
