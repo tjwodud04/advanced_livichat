@@ -38,7 +38,7 @@ haru_agent = Agent(
 # --- 커스텀 워크플로우 ---
 class CustomHybridWorkflow(VoiceWorkflowBase):
     def __init__(self,
-                 selected_runner: Runner,
+                 selected_runner: Agent,
                  character_name: str,
                  emotion_analyzer: Callable[[str], Awaitable[Dict[str, Any]]]):
         super().__init__()
@@ -123,14 +123,11 @@ class CustomHybridWorkflow(VoiceWorkflowBase):
 def create_voice_pipeline(api_key: str, character: str, a_emotion_analyzer):
     from agents.voice import VoicePipelineConfig
 
-    # 에이전트별 Runner 생성
-    kei_runner = Runner(agent=kei_agent)
-    haru_runner = Runner(agent=haru_agent)
-    
-    runners = {"kei": kei_runner, "haru": haru_runner}
+    # 에이전트별 Agent 인스턴스 직접 사용
+    runners = {"kei": kei_agent, "haru": haru_agent}
     voice_map = {'kei': 'alloy', 'haru': 'nova'}
     
-    selected_runner = runners.get(character, kei_runner)
+    selected_runner = runners.get(character, kei_agent)
     selected_voice = voice_map.get(character, 'alloy')
 
     workflow = CustomHybridWorkflow(
