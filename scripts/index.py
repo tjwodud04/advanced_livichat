@@ -13,6 +13,8 @@ import json  # JSON 데이터 처리를 위한 모듈 임포트
 import websockets  # WebSocket 연결용
 import asyncio
 import functools
+from scripts.audio_util import convert_webm_to_pcm16
+from agents.voice import AudioInput
 
 # 새로 만든 코어 로직 임포트
 from scripts.voice_agent_core import create_voice_pipeline
@@ -148,7 +150,14 @@ async def chat():
 
         audio_bytes = audio_file.read()
         
-        result = await pipeline.run(audio_bytes)
+        # webm -> PCM numpy array 변환 후 AudioInput으로 감싸기
+        pcm_bytes = convert_webm_to_pcm16(audio_bytes)
+        import numpy as np
+        if pcm_bytes is None:
+            return jsonify({"error": "오디오 변환 실패"}), 500
+        samples = np.frombuffer(pcm_bytes, dtype=np.int16)
+        audio_input = AudioInput(buffer=samples, frame_rate=24000, sample_width=2, channels=1)
+        result = await pipeline.run(audio_input)
         
         final_result = await result.get_result()
         final_audio_bytes = b"".join([chunk async for chunk in result.audio])
