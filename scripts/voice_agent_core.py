@@ -2,7 +2,6 @@ import asyncio
 from typing import Dict, AsyncGenerator, Callable, Awaitable, Any, List
 
 from agents import Agent, Runner
-from agents.items import TextChunk
 from agents.tool import WebSearchTool
 from agents.voice import (
     VoicePipeline,
@@ -105,10 +104,11 @@ class CustomHybridWorkflow(VoiceWorkflowBase):
             # Track 2: 기존과 동일
             ai_speech_text = ""
             stream = await self.selected_runner.run(messages=[{"role": "user", "content": user_text}])
-            async for item in stream:
-                if isinstance(item, TextChunk):
-                    yield item.text
-                    ai_speech_text += item.text
+            async for chunk in stream:
+                content = chunk.choices[0].delta.content
+                if content:
+                    yield content
+                    ai_speech_text += content
             final_text_response = ai_speech_text
 
         # 최종 결과를 딕셔너리 형태로 저장하여, 나중에 쉽게 꺼내 쓸 수 있도록 함
