@@ -38,6 +38,18 @@ document.addEventListener('DOMContentLoaded', () => {
         setApiKeyBtn.textContent = 'API 키 변경';
     }
 
+    // 페이지 진입 시 API 키 없으면 모달 자동 오픈
+    if (!savedApiKey) {
+        modal.style.display = 'block';
+        // 안내문구 명확히
+        modal.querySelector('h2').textContent = 'OpenAI API Key가 필요합니다.';
+        modal.querySelector('p').textContent = '서비스 이용을 위해 OpenAI API Key를 입력해주세요.';
+    } else {
+        // 안내문구 원래대로(버튼 클릭 시)
+        modal.querySelector('h2').textContent = 'OpenAI API 키 설정';
+        modal.querySelector('p').textContent = '대화를 시작하기 위해 OpenAI API 키를 입력해주세요.';
+    }
+
     // 모달 열기
     setApiKeyBtn.addEventListener('click', function() {
         modal.style.display = 'block';
@@ -47,6 +59,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             apiKeyInput.value = '';
         }
+        // 안내문구 원래대로
+        modal.querySelector('h2').textContent = 'OpenAI API 키 설정';
+        modal.querySelector('p').textContent = '대화를 시작하기 위해 OpenAI API 키를 입력해주세요.';
     });
 
     // 모달 닫기

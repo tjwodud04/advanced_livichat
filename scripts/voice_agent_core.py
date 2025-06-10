@@ -6,8 +6,7 @@ from agents.tool import WebSearchTool
 from agents.voice import (
     VoicePipeline,
     VoiceWorkflowBase,
-    OpenAIStt,
-    OpenAITts,
+    VoicePipelineConfig,
 )
 
 # --- 검색 Tool 및 Agent 정의 ---
@@ -122,9 +121,8 @@ class CustomHybridWorkflow(VoiceWorkflowBase):
 
 # --- Voice Pipeline 생성 함수 ---
 def create_voice_pipeline(api_key: str, character: str, a_emotion_analyzer):
-    
-    stt_model = OpenAIStt(api_key=api_key, model="whisper-1")
-    
+    from agents.voice import VoicePipelineConfig
+
     # 에이전트별 Runner 생성
     kei_runner = Runner(agent=kei_agent)
     haru_runner = Runner(agent=haru_agent)
@@ -134,8 +132,6 @@ def create_voice_pipeline(api_key: str, character: str, a_emotion_analyzer):
     
     selected_runner = runners.get(character, kei_runner)
     selected_voice = voice_map.get(character, 'alloy')
-    
-    tts_model = OpenAITts(api_key=api_key, model="tts-1-hd", voice=selected_voice)
 
     workflow = CustomHybridWorkflow(
         selected_runner=selected_runner,
@@ -143,9 +139,22 @@ def create_voice_pipeline(api_key: str, character: str, a_emotion_analyzer):
         emotion_analyzer=a_emotion_analyzer
     )
 
+    # VoicePipelineConfig를 사용해 모델명, voice, api_key를 지정
+    config = VoicePipelineConfig()
+    config.stt_settings = config.stt_settings or {}
+    config.tts_settings = config.tts_settings or {}
+    config.stt_settings.model = 'whisper-1'
+    config.tts_settings.model = 'tts-1-hd'
+    config.tts_settings.voice = selected_voice
+    config.model_provider = None  # 기본(OpenAIVoiceModelProvider) 사용
+    # OpenAI API 키를 환경변수로 전달
+    import os
+    os.environ['OPENAI_API_KEY'] = api_key
+
     pipeline = VoicePipeline(
         workflow=workflow,
-        stt_model=stt_model,
-        tts_model=tts_model,
+        stt_model='whisper-1',
+        tts_model='tts-1-hd',
+        config=config,
     )
     return pipeline 
