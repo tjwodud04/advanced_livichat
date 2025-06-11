@@ -92,7 +92,7 @@ def serve_js(filename):
 @app.route('/scripts/chat', methods=['POST'])
 async def chat():
     try:
-        # 1) Validation & setup
+        # 1) 요청 검증 및 API 키 설정
         if 'audio' not in request.files:
             return jsonify({"error": "No audio file provided"}), 400
         api_key = request.headers.get('X-API-KEY')
@@ -100,7 +100,7 @@ async def chat():
             return jsonify({"error": "X-API-KEY header is required"}), 401
         os.environ['OPENAI_API_KEY'] = api_key
 
-        # 2) Read & convert WebM → PCM
+        # 2) WebM → PCM 변환
         audio_file = request.files['audio']
         webm_bytes = audio_file.read()
         samples = convert_webm_to_pcm16(webm_bytes)
@@ -117,7 +117,7 @@ async def chat():
         )
         user_text = await pipeline._process_audio_input(audio_input)
 
-        # 4) Update history with user_text
+        # 4) 이력 업데이트 (user)
         with history_lock:
             conversation_history.append({"role": "user", "content": user_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
@@ -125,37 +125,30 @@ async def chat():
 
         # 5) ChatCompletion → ai_text
         client = get_openai_client(api_key)
-        messages = conversation_history.copy()
-        # Ensure a system message is at the front, or rely on Agent.prompt if you prefer
         response = await asyncio.to_thread(
             client.chat.completions.create,
             model="gpt-4o",
-            messages=messages,
+            messages=conversation_history.copy(),
             max_tokens=256,
             temperature=0.7,
         )
         ai_text = response.choices[0].message.content
 
-        # 6) Update history with ai_text
+        # 6) 이력 업데이트 (assistant)
         with history_lock:
             conversation_history.append({"role": "assistant", "content": ai_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # 7) TTS → audio stream
+        # 7) TTS → audio bytes
         tts_model = pipeline._get_tts_model()
+        tts_settings = pipeline.config.tts_settings
         audio_chunks = []
-        async for event in tts_model.stream(ai_text):
-            # these are VoiceStreamEventAudio instances
-            if isinstance(event, VoiceStreamEventAudio):
-                audio_chunks.append(event.data.tobytes())
-            # stop when the TTS session ends
-            if isinstance(event, VoiceStreamEventLifecycle) and event.event == "session_ended":
-                break
-
+        async for chunk in tts_model.run(ai_text, tts_settings):
+            audio_chunks.append(chunk)
         audio_base64 = base64.b64encode(b"".join(audio_chunks)).decode()
 
-        # 8) Return both text and audio
+        # 8) JSON 응답
         return jsonify({
             "user_text": user_text,
             "ai_text": ai_text,
@@ -165,6 +158,7 @@ async def chat():
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({"error": f"Failed to process audio: {e}"}), 500
+
 
 if __name__ == '__main__':
     app.run(port=8001, debug=True)
