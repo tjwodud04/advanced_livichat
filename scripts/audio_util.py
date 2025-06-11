@@ -13,7 +13,7 @@ def convert_webm_to_pcm16(webm_data):
 
         # ffmpeg 명령어를 파이프 기반으로 실행
         ffmpeg = (
-            FFmpeg()
+            FFmpeg(executable="./scripts/ffmpeg")
             .input('pipe:0')
             .output('pipe:1', format='s16le', acodec='pcm_s16le', ar=24000, ac=1)
         )
