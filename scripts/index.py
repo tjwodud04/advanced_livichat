@@ -3,28 +3,21 @@ import base64
 import asyncio
 import functools
 import threading
-import re
-import ast
-
+import json
 from flask import Flask, request, jsonify, abort, send_from_directory, render_template
 from flask_cors import CORS
 from openai import OpenAI
 from agents import Runner
-
 from agents.voice import AudioInput
-
 from scripts.audio_util import convert_webm_to_pcm16
 from scripts.voice_agent_core import create_voice_pipeline, ContentFinderAgent
 
-app = Flask(
-    __name__,
-    static_folder='../front',
-    static_url_path='',
-    template_folder='../front'
-)
+app = Flask(__name__,
+            static_folder='../front',
+            static_url_path='',
+            template_folder='../front')
 CORS(app)
 
-# 대화 이력
 conversation_history = []
 history_lock = threading.Lock()
 HISTORY_MAX_LEN = 6
@@ -35,63 +28,50 @@ def get_openai_client(api_key: str):
     return OpenAI(api_key=api_key)
 
 async def analyze_emotion(text: str, api_key: str):
-    """GPT-4o로 유교 7정(기쁨·분노·슬픔·두려움·사랑·미움·욕심) 비율과 최고 감정 추출."""
+    """
+    불교 칠정(희·노·애·낙·애(愛)·오·욕)에 대해
+    반드시 JSON 형식만 반환하도록 강제합니다.
+    """
     client = get_openai_client(api_key)
     prompt = (
-        "다음 문장에서 유교의 7정(기쁨, 분노, 슬픔, 두려움, 사랑, 미움, 욕심)에 대해 "
-        "각각 0~100%로 감정 비율을 추정해 주세요. 가장 높은 감정도 함께 알려주세요.\n"
+        "다음 문장을 분석하여, 반드시 아래 JSON 형식만 출력해 주세요:\n"
+        "{\n"
+        '  "희":0, "노":0, "애":0, "낙":0, "애(愛)":0, "오":0, "욕":0,\n'
+        '  "top_emotion": "희"\n'
+        "}\n"
         f"문장: {text}"
     )
     response = await asyncio.to_thread(
         client.chat.completions.create,
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=256,
+        max_tokens=128,
         temperature=0.0,
     )
-    content = response.choices[0].message.content
-    match = re.match(r'\s*({.*?})\s*,\s*"([^"]+)"', content)
-    if match:
-        try:
-            percent: dict = ast.literal_eval(match.group(1))
-            top_emotion: str = match.group(2)
-            keys = ["기쁨","분노","슬픔","두려움","사랑","미움","욕심"]
-            if isinstance(percent, dict) and all(k in percent for k in keys):
-                return percent, top_emotion
-        except Exception:
-            pass
-    # 기본값
-    zero = {k: 0 for k in ["기쁨","분노","슬픔","두려움","사랑","미움","욕심"]}
-    return zero, "기쁨"
+    content = response.choices[0].message.content.strip()
+    try:
+        # JSON 오브젝트 부분만 추출
+        obj = json.loads(content)
+        # 키 검증
+        keys = ["희","노","애","낙","애(愛)","오","욕","top_emotion"]
+        if all(k in obj for k in keys):
+            percent = {k: obj[k] for k in keys if k != "top_emotion"}
+            top_emotion = obj["top_emotion"]
+            return percent, top_emotion
+    except Exception as e:
+        print(f"[analyze_emotion] JSON 파싱 실패: {e}\n원본문자열: {content}")
+
+    # 파싱 실패 시 기본값
+    zero = {k: 0 for k in ["희","노","애","낙","애(愛)","오","욕"]}
+    return zero, "희"
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/haru')
-def haru():
-    return render_template('haru.html')
-
-@app.route('/kei')
-def kei():
-    return render_template('kei.html')
-
-@app.route('/model/<path:filename>')
-def serve_model(filename):
-    return send_from_directory('../model', filename)
-
-@app.route('/css/<path:filename>')
-def serve_css(filename):
-    return send_from_directory('../front/css', filename)
-
-@app.route('/js/<path:filename>')
-def serve_js(filename):
-    return send_from_directory('../front/js', filename)
-
 @app.route('/scripts/chat', methods=['POST'])
 async def chat():
     try:
-        # 1) 요청 검증 및 API 키 설정
         if 'audio' not in request.files:
             return jsonify({"error": "No audio file provided"}), 400
         api_key = request.headers.get('X-API-KEY')
@@ -99,15 +79,14 @@ async def chat():
             return jsonify({"error": "X-API-KEY header is required"}), 401
         os.environ['OPENAI_API_KEY'] = api_key
 
-        # 2) WebM → PCM 변환
-        audio_file = request.files['audio']
-        webm_bytes = audio_file.read()
+        # 1) WebM → PCM 변환
+        webm_bytes = request.files['audio'].read()
         samples = convert_webm_to_pcm16(webm_bytes)
         if samples is None:
             return jsonify({"error": "오디오 변환 실패"}), 500
         audio_input = AudioInput(buffer=samples, frame_rate=24000, sample_width=2, channels=1)
 
-        # 3) STT → user_text
+        # 2) STT → user_text
         pipeline = create_voice_pipeline(
             api_key,
             request.form.get('character', 'kei'),
@@ -116,34 +95,28 @@ async def chat():
         )
         user_text = await pipeline._process_audio_input(audio_input)
 
-        # 4) 감정 분석
+        # 3) 감정 분석
         emotion_percent, top_emotion = await analyze_emotion(user_text, api_key)
 
-        # 5) 대화 이력에 user 추가
+        # 4) 대화 이력 갱신 (user)
         with history_lock:
             conversation_history.append({"role": "user", "content": user_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # 6) 부정 감정일 때 추천 vs 일반 채팅
-        negative = {'분노','슬픔','미움','두려움'}
+        # 5) 감정 분기
+        negative = {'노','애','오'}  # 분노·슬픔·미움에 대응
         if top_emotion in negative:
-            prompt = (
-                f"{top_emotion} 감정을 느낄 때 듣기 좋은 노래나 위로가 되는 영상 3개를 "
-                "제목과 URL 형태로 나열해 줘"
-            )
+            prompt = f"{top_emotion} 감정을 완화할 수 있는 영상이나 음악 3개의 URL만 JSON 배열로 반환해 주세요."
             search_run = await Runner.run(ContentFinderAgent, prompt)
-            raw = search_run.final_output
-            urls = re.findall(r'https?://[^\s\n)]+', raw)
-            emotion_map = {'분노':'노(화남)','슬픔':'애(슬픔)','미움':'오(싫어함)','두려움':'구(두려움)'}
-            label = emotion_map[top_emotion]
-            display = f"{label}을 느끼고 계시군요. 도움이 될 만한 콘텐츠를 추천드릴게요:\n"
-            if urls:
-                for i, u in enumerate(urls[:3],1):
-                    display += f"{i}. {u}\n"
-            else:
-                display += "죄송해요. 추천을 찾지 못했습니다."
-            ai_text = display
+            try:
+                urls = json.loads(search_run.final_output)
+            except:
+                urls = []
+            ai_text = (
+                f"{top_emotion} 감정이 느껴지시는군요. 아래 콘텐츠를 추천드려요:\n" +
+                "\n".join(f"{i+1}. {u}" for i, u in enumerate(urls))
+            )
         else:
             client = get_openai_client(api_key)
             completion = await asyncio.to_thread(
@@ -155,21 +128,24 @@ async def chat():
             )
             ai_text = completion.choices[0].message.content
 
-        # 7) 대화 이력에 assistant 추가
+        # 6) 대화 이력 갱신 (assistant)
         with history_lock:
             conversation_history.append({"role": "assistant", "content": ai_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # 8) TTS → audio bytes
+        # 7) TTS → audio chunks + 로깅
         tts_model = pipeline._get_tts_model()
         tts_settings = pipeline.config.tts_settings
         audio_chunks = []
         async for chunk in tts_model.run(ai_text, tts_settings):
+            print(f"[TTS] chunk size: {len(chunk)} bytes")
             audio_chunks.append(chunk)
-        audio_base64 = base64.b64encode(b"".join(audio_chunks)).decode()
+        raw_pcm = b"".join(audio_chunks)
 
-        # 9) 최종 응답
+        # (옵션) PCM → WAV 래핑: WAV 헤더를 추가하려면 여기서 처리
+        audio_base64 = base64.b64encode(raw_pcm).decode()
+
         return jsonify({
             "user_text": user_text,
             "ai_text": ai_text,
