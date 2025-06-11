@@ -39,95 +39,98 @@ haru_agent = Agent(
 
 # --- 커스텀 워크플로우 ---
 class CustomHybridWorkflow(VoiceWorkflowBase):
-    def __init__(self,
-                 selected_runner: Agent,
-                 character_name: str,
-                 emotion_analyzer: Callable[[str], Awaitable[Dict[str, Any]]]):
+    def __init__(
+        self,
+        selected_runner: Agent,
+        character_name: str,
+        emotion_analyzer: Callable[[str], Awaitable[Any]],
+        history_ref: list
+    ):
         super().__init__()
         self.selected_runner = selected_runner
         self.character_name = character_name
         self.emotion_analyzer = emotion_analyzer
+        self.history = history_ref
 
-    async def run(self, transcript: str, history=None):
+    async def run(self, transcript: str) -> AsyncGenerator[str, None]:
         user_text = transcript
-        
         emotion_percent, top_emotion = await self.emotion_analyzer(user_text)
 
         negative_emotions = {'분노', '슬픔', '미움', '두려움'}
-        
         final_text_response = ""
-        
+
         if top_emotion in negative_emotions:
-            # Track 1: Agent를 사용한 콘텐츠 검색 및 규칙 기반 응답
+            # Track 1: 에이전트 검색 및 추천 로직
             search_query = f"{top_emotion} 감정을 느낄 때 듣기 좋은 노래나 위로가 되는 영상"
             search_result = await ContentFinderAgent.run(search_query)
-            
-            # --- emotion_response_generator.py의 로직을 직접 통합 ---
             emotion_map = {
                 '분노': '노(화남)', '슬픔': '애(슬픔)',
                 '미움': '오(싫어함)', '두려움': '구(두려움)',
             }
             category = emotion_map.get(top_emotion, "기타")
-            
             tones = {
-                'kei': { # 따뜻하고 세련된 톤
-                    'suggest': f"그런 {category} 감정을 느끼실 땐, 잠시 다른 곳에 집중해보는 건 어때요? 이런 정보는 어떨까요?",
-                    'empathize': f"그런 {category} 감정을 느끼셨군요. 제가 그 마음을 다 헤아릴 순 없겠지만, 함께 방법을 찾아봐요."
+                'kei': {
+                    'suggest': (
+                        f"그런 {category} 감정을 느끼실 땐, 잠시 다른 곳에 집중해보는 건 어때요? "
+                        "이런 정보는 어떨까요?"
+                    ),
+                    'empathize': (
+                        f"그런 {category} 감정을 느끼셨군요. 제가 그 마음을 다 헤아릴 순 없겠지만, "
+                        "함께 방법을 찾아봐요."
+                    ),
                 },
-                'haru': { # 명확하고 실용적인 톤
-                    'suggest': f"그런 {category} 감정에는 환기가 필요합니다. 다음 정보를 참고해보시는 걸 추천합니다.",
-                    'empathize': f"그런 {category} 감정을 느끼셨군요. 문제 해결에 도움이 될 만한 것을 찾아보는 게 좋겠습니다."
-                }
+                'haru': {
+                    'suggest': (
+                        f"그런 {category} 감정에는 환기가 필요합니다. 다음 정보를 참고해보시는 걸 추천합니다."
+                    ),
+                    'empathize': (
+                        f"그런 {category} 감정을 느끼셨군요. 문제 해결에 도움이 될 만한 것을 찾아보는 게 좋겠습니다."
+                    ),
+                },
             }
             selected_tone = tones.get(self.character_name, tones['kei'])
             speech_text = selected_tone['suggest']
             if category in ['애(슬픔)', '구(두려움)']:
                 speech_text = selected_tone['empathize']
-            
-            # search_result.text에 포함된 링크들을 파싱하여 추천 목록 생성
-            # Agent가 반환한 텍스트에서 URL들을 직접 추출합니다.            
             url_pattern = re.compile(r'https?://[^\s\n)]+')
             found_urls = url_pattern.findall(search_result.text)
-
+            display_text = f"{speech_text}\n\n"
             if found_urls:
-                display_text = f"{speech_text}\n\n"
-                for i, url in enumerate(found_urls[:3]): # 최대 3개의 링크만 표시
+                for i, url in enumerate(found_urls[:3]):
                     display_text += f"* 추천 콘텐츠 {i+1}: {url}\n"
             else:
-                display_text = f"{speech_text}\n\n추천 콘텐츠를 찾지 못했어요."
-
+                display_text += "추천 콘텐츠를 찾지 못했어요."
             final_text_response = display_text
-            # --------------------------------------------------------
-            
             yield speech_text
         else:
-            # Track 2: 기존과 동일
+            # Track 2: 일반 채팅 로직
+            messages = self.history.copy() + [{"role": "user", "content": user_text}]
             ai_speech_text = ""
-            # history가 있으면 이력 + 현재 발화, 없으면 기존대로
-            if history:
-                messages = history + [{"role": "user", "content": user_text}]
-            else:
-                messages = [{"role": "user", "content": user_text}]
             stream = await self.selected_runner.run(messages=messages)
             async for chunk in stream:
-                content = chunk.choices[0].delta.content
-                if content:
-                    yield content
-                    ai_speech_text += content
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+                    ai_speech_text += delta
             final_text_response = ai_speech_text
 
-        # 최종 결과를 딕셔너리 형태로 저장하여, 나중에 쉽게 꺼내 쓸 수 있도록 함
+        # 결과 저장 및 반환
         self.set_result({
             "user_text": user_text,
             "ai_text": final_text_response,
             "emotion": top_emotion,
             "emotion_percent": emotion_percent,
         })
-        yield final_text_response      
+        yield final_text_response
 
 
 # --- Voice Pipeline 생성 함수 ---
-def create_voice_pipeline(api_key: str, character: str, a_emotion_analyzer):
+def create_voice_pipeline(
+    api_key: str,
+    character: str,
+    a_emotion_analyzer,
+    history_ref: list  # 대화 이력 리스트를 전달받음
+):
     # 에이전트별 Agent 인스턴스 직접 사용
     runners = {"kei": kei_agent, "haru": haru_agent}
     voice_map = {'kei': 'alloy', 'haru': 'nova'}
@@ -138,7 +141,8 @@ def create_voice_pipeline(api_key: str, character: str, a_emotion_analyzer):
     workflow = CustomHybridWorkflow(
         selected_runner=selected_runner,
         character_name=character,
-        emotion_analyzer=a_emotion_analyzer
+        emotion_analyzer=a_emotion_analyzer,
+        history_ref=history_ref
     )
 
     # VoicePipelineConfig를 사용해 모델명, voice, api_key를 지정

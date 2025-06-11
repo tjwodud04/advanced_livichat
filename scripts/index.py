@@ -114,12 +114,18 @@ async def chat():
 
         emotion_analyzer_with_key = functools.partial(analyze_emotion, api_key=api_key)
         
-        pipeline = create_voice_pipeline(api_key, character, emotion_analyzer_with_key)
+        pipeline = create_voice_pipeline(
+            api_key,
+            character,
+            emotion_analyzer_with_key,
+            conversation_history
+            )
 
         audio_bytes = audio_file.read()
         
         # webm -> PCM numpy array 변환 후 AudioInput으로 감싸기
         samples = convert_webm_to_pcm16(audio_bytes)
+        
         if samples is None:
             return jsonify({"error": "오디오 변환 실패"}), 500
         audio_input = AudioInput(buffer=samples, frame_rate=24000, sample_width=2, channels=1)
@@ -130,8 +136,7 @@ async def chat():
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # pipeline에 대화 이력 전달 (CustomHybridWorkflow에서 messages 인자로 받도록 수정 필요)
-        result = await pipeline.run(audio_input, history=conversation_history.copy())
+        result = await pipeline.run(audio_input)
         # result.get_result()에서 user_text, ai_text 추출
         final_result = await result.get_result()
         final_audio_bytes = b"".join([chunk async for chunk in result.audio])
