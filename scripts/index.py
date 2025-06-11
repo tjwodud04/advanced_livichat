@@ -92,63 +92,74 @@ def serve_js(filename):
 @app.route('/scripts/chat', methods=['POST'])
 async def chat():
     try:
-        # 요청 검증
+        # 1) Validation & setup
         if 'audio' not in request.files:
             return jsonify({"error": "No audio file provided"}), 400
         api_key = request.headers.get('X-API-KEY')
         if not api_key:
             return jsonify({"error": "X-API-KEY header is required"}), 401
-        # 환경변수 설정
         os.environ['OPENAI_API_KEY'] = api_key
 
+        # 2) Read & convert WebM → PCM
         audio_file = request.files['audio']
-        character = request.form.get('character', 'kei')
-        # emotion 분석을 미리 수행
-        webm_data = audio_file.read()
-        samples = convert_webm_to_pcm16(webm_data)
+        webm_bytes = audio_file.read()
+        samples = convert_webm_to_pcm16(webm_bytes)
         if samples is None:
             return jsonify({"error": "오디오 변환 실패"}), 500
         audio_input = AudioInput(buffer=samples, frame_rate=24000, sample_width=2, channels=1)
 
-        # STT 수행
-        pipeline = create_voice_pipeline(api_key, character, functools.partial(analyze_emotion, api_key=api_key), conversation_history)
+        # 3) STT → user_text
+        pipeline = create_voice_pipeline(
+            api_key,
+            request.form.get('character', 'kei'),
+            functools.partial(analyze_emotion, api_key=api_key),
+            conversation_history
+        )
         user_text = await pipeline._process_audio_input(audio_input)
 
-        # 청크 수집 전에 emotion 분석
-        emotion_percent, top_emotion = await analyze_emotion(user_text, api_key)
-
-        # 이력 업데이트
+        # 4) Update history with user_text
         with history_lock:
             conversation_history.append({"role": "user", "content": user_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # 챗 파이프라인 실행 및 TTS
-        result = await pipeline.run(audio_input)
-        ai_text = result.total_output_text
+        # 5) ChatCompletion → ai_text
+        client = get_openai_client(api_key)
+        messages = conversation_history.copy()
+        # Ensure a system message is at the front, or rely on Agent.prompt if you prefer
+        response = await asyncio.to_thread(
+            client.chat.completions.create,
+            model="gpt-4o",
+            messages=messages,
+            max_tokens=256,
+            temperature=0.7,
+        )
+        ai_text = response.choices[0].message.content
 
-        audio_chunks = []
-        async for event in result.stream():
-            if isinstance(event, VoiceStreamEventAudio):
-                audio_chunks.append(event.data.tobytes())
-            if isinstance(event, VoiceStreamEventLifecycle) and event.event == "session_ended":
-                break
-        final_audio = b"".join(audio_chunks)
-        audio_base64 = base64.b64encode(final_audio).decode()
-
-        # assistant 이력
+        # 6) Update history with ai_text
         with history_lock:
             conversation_history.append({"role": "assistant", "content": ai_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # 응답
+        # 7) TTS → audio stream
+        tts_model = pipeline._get_tts_model()
+        audio_chunks = []
+        async for event in tts_model.stream(ai_text):
+            # these are VoiceStreamEventAudio instances
+            if isinstance(event, VoiceStreamEventAudio):
+                audio_chunks.append(event.data.tobytes())
+            # stop when the TTS session ends
+            if isinstance(event, VoiceStreamEventLifecycle) and event.event == "session_ended":
+                break
+
+        audio_base64 = base64.b64encode(b"".join(audio_chunks)).decode()
+
+        # 8) Return both text and audio
         return jsonify({
             "user_text": user_text,
             "ai_text": ai_text,
             "audio_base64": audio_base64,
-            "emotion": top_emotion,
-            "emotion_percent": emotion_percent
         })
 
     except Exception as e:
