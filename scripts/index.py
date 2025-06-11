@@ -1,3 +1,5 @@
+# index.py (통합된 전체 코드)
+
 import io
 import base64
 import asyncio
@@ -69,7 +71,6 @@ async def analyze_emotion(text: str, api_key: str):
                 return percent, top_emotion
         except:
             pass
-    # 기본 반환
     return {k:0 for k in ["기쁨","분노","슬픔","두려움","사랑","미움","욕심"]}, "기쁨"
 
 # 라우트 핸들러
@@ -100,7 +101,6 @@ def serve_js(filename):
 @app.route('/scripts/chat', methods=['POST'])
 async def chat():
     try:
-        # 파일 및 헤더 검증
         if 'audio' not in request.files:
             return jsonify({"error": "No audio file provided"}), 400
         api_key = request.headers.get('X-API-KEY')
@@ -155,7 +155,6 @@ async def chat():
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # JSON 응답
         return jsonify({
             "user_text": user_text,
             "ai_text": ai_text,
