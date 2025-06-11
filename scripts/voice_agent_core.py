@@ -5,7 +5,7 @@ from typing import Any, AsyncGenerator, Awaitable, Callable, Dict
 from agents import Agent, Runner
 from openai.types.responses import ResponseTextDeltaEvent
 from agents.voice import VoiceWorkflowBase, VoicePipeline, VoicePipelineConfig
-from agents.voice.model_provider import OpenAIVoiceModelProvider
+from agents.voice.models.openai_model_provider import OpenAIVoiceModelProvider
 from agents.tool import WebSearchTool
 
 # 검색 Tool 및 Agent 정의
@@ -125,7 +125,6 @@ def create_voice_pipeline(
     config.stt_settings.model = "whisper-1"
     config.tts_settings.model = "tts-1-hd"
     config.tts_settings.voice = selected_voice
-    # OpenAI 프로바이더 할당
     config.model_provider = OpenAIVoiceModelProvider(api_key=api_key)
 
     pipeline = VoicePipeline(
