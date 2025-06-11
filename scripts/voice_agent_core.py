@@ -54,48 +54,31 @@ class CustomHybridWorkflow(VoiceWorkflowBase):
         self.history = history_ref
 
     async def run(self, transcript: str) -> AsyncGenerator[str, None]:
-        # 1) 감정 추출
         user_text = transcript
         emotion_percent, top_emotion = await self.emotion_analyzer(user_text)
-
         negative_emotions = {'분노', '슬픔', '미움', '두려움'}
         final_text_response = ""
 
         if top_emotion in negative_emotions:
-            # 2) 감정 기반 추천 트랙
-            # 에이전트 호출 (동기 실행)
             search_prompt = f"{top_emotion} 감정을 느낄 때 듣기 좋은 노래나 위로가 되는 영상"
             search_run = Runner.run(ContentFinderAgent, search_prompt)
             search_text = search_run.final_output
 
-            # 감정별 카테고리 매핑
             emotion_map = {
                 '분노': '노(화남)', '슬픔': '애(슬픔)',
                 '미움': '오(싫어함)', '두려움': '구(두려움)',
             }
             category = emotion_map.get(top_emotion, '기타')
-
-            # 톤 별 메시지 선택
             tones = {
-                'kei': {
-                    'suggest': f"그런 {category} 감정일 때 잠시 집중을 돌려보세요. 아래 정보가 도움이 될 거예요.",
-                    'empathize': f"그런 {category} 감정을 느끼셨군요. 제가 다 이해할 순 없지만, 함께 위로해드릴게요." 
-                },
-                'haru': {
-                    'suggest': f"그 {category} 감정에는 잠시 환기가 필요합니다. 아래 링크를 확인해보세요.",
-                    'empathize': f"그 {category} 감정에 공감합니다. 도움이 될 만한 자료를 소개할게요."
-                }
+                'kei': {'suggest': f"그런 {category} 감정일 때 잠시 집중을 돌려보세요. 아래 정보가 도움이 될 거예요.",
+                        'empathize': f"그런 {category} 감정을 느끼셨군요. 제가 다 이해할 순 없지만, 함께 위로해드릴게요."},
+                'haru': {'suggest': f"그 {category} 감정에는 환기가 필요합니다. 아래 링크를 확인해보세요.",
+                         'empathize': f"그 {category} 감정에 공감합니다. 도움이 될 만한 자료를 소개할게요."}
             }
             tone = tones.get(self.character_name, tones['kei'])
-            # 기분에 따라 추천/공감 문구 설정
-            if top_emotion in ['슬픔', '두려움']:
-                speech_text = tone['empathize']
-            else:
-                speech_text = tone['suggest']
+            speech_text = tone['empathize'] if top_emotion in ['슬픔', '두려움'] else tone['suggest']
 
-            # URL 파싱
             urls = re.findall(r'https?://[^\s\n)]+', search_text)
-            # 응답 조합
             display_text = f"{speech_text}\n"
             if urls:
                 for i, url in enumerate(urls[:3], 1):
@@ -104,11 +87,9 @@ class CustomHybridWorkflow(VoiceWorkflowBase):
                 display_text += "추천 콘텐츠를 찾지 못했어요."
 
             final_text_response = display_text
-            # 사용자에게 먼저 요약된 speech_text 전달
             yield speech_text
 
         else:
-            # 3) 일반 채팅 트랙 (스트리밍)
             messages = self.history.copy() + [{"role": "user", "content": user_text}]
             streaming_run = Runner.run_streamed(self.selected_runner, messages)
             ai_speech = ""
@@ -119,13 +100,6 @@ class CustomHybridWorkflow(VoiceWorkflowBase):
                     ai_speech += delta
             final_text_response = ai_speech
 
-        # 4) 최종 결과 저장 및 반환
-        self.set_result({
-            "user_text": user_text,
-            "ai_text": final_text_response,
-            "emotion": top_emotion,
-            "emotion_percent": emotion_percent,
-        })
         yield final_text_response
 
 # 파이프라인 생성 함수
@@ -156,10 +130,9 @@ def create_voice_pipeline(
     config.tts_settings.voice = selected_voice
     config.model_provider = OpenAIVoiceModelProvider(api_key=api_key)
 
-    pipeline = VoicePipeline(
+    return VoicePipeline(
         workflow=workflow,
         stt_model="whisper-1",
         tts_model="tts-1-hd",
         config=config,
     )
-    return pipeline

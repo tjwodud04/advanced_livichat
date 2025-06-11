@@ -16,24 +16,16 @@ from openai import OpenAI
 from agents.voice.events import VoiceStreamEventAudio, VoiceStreamEventLifecycle
 from agents.voice import AudioInput
 
-# 로컬 모듈 임포트
 from scripts.audio_util import convert_webm_to_pcm16
 from scripts.voice_agent_core import create_voice_pipeline
 
 # Flask 앱 초기화
-app = Flask(
-    __name__,
-    static_folder='../front',
-    static_url_path='',
-    template_folder='../front'
-)
+app = Flask(__name__, static_folder='../front', static_url_path='', template_folder='../front')
 CORS(app)
-
 # 대화 이력 관리
-conversation_history = []  # [{'role':..., 'content':...}, ...]
+conversation_history = []
 history_lock = threading.Lock()
-HISTORY_MAX_LEN = 6  # user/assistant 3턴씩 유지
-
+HISTORY_MAX_LEN = 6
 # 경로 설정
 BASE_DIR = Path(__file__).resolve().parent
 CONVERSATIONS_FILE = BASE_DIR / "conversations.json"
@@ -74,74 +66,67 @@ async def analyze_emotion(text: str, api_key: str):
 
 # 라우트 핸들러
 @app.route('/')
-def index():
+def index(): 
     return render_template('index.html')
 
 @app.route('/haru')
-def haru():
+def haru(): 
     return render_template('haru.html')
 
 @app.route('/kei')
-def kei():
+def kei(): 
     return render_template('kei.html')
 
 @app.route('/model/<path:filename>')
-def serve_model(filename):
+def serve_model(filename): 
     return send_from_directory('../model', filename)
 
 @app.route('/css/<path:filename>')
-def serve_css(filename):
+def serve_css(filename): 
     return send_from_directory('../front/css', filename)
 
 @app.route('/js/<path:filename>')
-def serve_js(filename):
+def serve_js(filename): 
     return send_from_directory('../front/js', filename)
 
 @app.route('/scripts/chat', methods=['POST'])
 async def chat():
     try:
+        # 요청 검증
         if 'audio' not in request.files:
             return jsonify({"error": "No audio file provided"}), 400
         api_key = request.headers.get('X-API-KEY')
         if not api_key:
             return jsonify({"error": "X-API-KEY header is required"}), 401
-
-        # 환경변수에 API 키 설정
+        # 환경변수 설정
         os.environ['OPENAI_API_KEY'] = api_key
 
         audio_file = request.files['audio']
         character = request.form.get('character', 'kei')
-        emotion_analyzer = functools.partial(analyze_emotion, api_key=api_key)
-
-        # 파이프라인 생성 (이력 리스트 전달)
-        pipeline = create_voice_pipeline(
-            api_key,
-            character,
-            emotion_analyzer,
-            conversation_history
-        )
-
-        # WebM → PCM 변환
-        webm_bytes = audio_file.read()
-        samples = convert_webm_to_pcm16(webm_bytes)
+        # emotion 분석을 미리 수행
+        webm_data = audio_file.read()
+        samples = convert_webm_to_pcm16(webm_data)
         if samples is None:
             return jsonify({"error": "오디오 변환 실패"}), 500
         audio_input = AudioInput(buffer=samples, frame_rate=24000, sample_width=2, channels=1)
 
-        # STT로 사용자 텍스트 추출
+        # STT 수행
+        pipeline = create_voice_pipeline(api_key, character, functools.partial(analyze_emotion, api_key=api_key), conversation_history)
         user_text = await pipeline._process_audio_input(audio_input)
+
+        # 청크 수집 전에 emotion 분석
+        emotion_percent, top_emotion = await analyze_emotion(user_text, api_key)
+
+        # 이력 업데이트
         with history_lock:
             conversation_history.append({"role": "user", "content": user_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
-        # 음성 챗 파이프라인 실행 (TTS 포함)
+        # 챗 파이프라인 실행 및 TTS
         result = await pipeline.run(audio_input)
-
-        # AI 응답 텍스트
         ai_text = result.total_output_text
 
-        # 오디오 스트림 수집
         audio_chunks = []
         async for event in result.stream():
             if isinstance(event, VoiceStreamEventAudio):
@@ -151,15 +136,19 @@ async def chat():
         final_audio = b"".join(audio_chunks)
         audio_base64 = base64.b64encode(final_audio).decode()
 
+        # assistant 이력
         with history_lock:
             conversation_history.append({"role": "assistant", "content": ai_text})
             if len(conversation_history) > HISTORY_MAX_LEN:
                 conversation_history.pop(0)
 
+        # 응답
         return jsonify({
             "user_text": user_text,
             "ai_text": ai_text,
             "audio_base64": audio_base64,
+            "emotion": top_emotion,
+            "emotion_percent": emotion_percent
         })
 
     except Exception as e:
