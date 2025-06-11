@@ -151,8 +151,7 @@ def create_voice_pipeline(
     config.tts_settings = config.tts_settings or {}
     config.stt_settings.model = 'whisper-1'
     config.tts_settings.model = 'tts-1-hd'
-    config.tts_settings.voice = selected_voice
-    config.model_provider = None  # 기본(OpenAIVoiceModelProvider) 사용
+    config.tts_settings.voice = selected_voice    
     
     # OpenAI API 키를 환경변수로 전달
     os.environ['OPENAI_API_KEY'] = api_key
