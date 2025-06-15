@@ -166,7 +166,8 @@ async def chat():
             "character": character, "user_text": user_text, "emotion_percent": emotion_percent,
             "top_emotion": top_emotion, "ai_text": ai_text
         }
-        blob_name = f"logs/{datetime.datetime.strftime('%Y-%m-%dT%H-%M-%SZ')}_{character}.json"
+        now = datetime.datetime.now(datetime.UTC)
+        blob_name = f"logs/{now.strftime('%Y-%m-%dT%H-%M-%SZ')}_{character}.json"
         asyncio.create_task(asyncio.to_thread(upload_log_to_vercel_blob, blob_name, log_data))
 
         # 5. 최종 응답
