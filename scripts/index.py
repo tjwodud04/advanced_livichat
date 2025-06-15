@@ -105,7 +105,7 @@ async def chat():
         needs_web_search = top_emotion in ["노", "애", "오"]
         
         if needs_web_search:
-            messages.append({"role": "user", "content": f"{user_text}\n(사용자가 '{top_emotion}' 감정을 느끼고 있습니다. 따뜻한 위로의 말과 함께 웹 검색을 사용해 관련된 위로가 되는 콘텐츠 URL을 찾아 제안해주세요.)"})
+            messages.append({"role": "user", "content": f"{user_text}\n(사용자가 '{top_emotion}' 감정을 느끼고 있습니다. 따뜻한 위로의 말과 함께 웹 검색을 사용해 관련된 위로가 되는 YouTube 영상 또는 음악 URL을 찾아 제안해주세요.)"})
         else:
             if top_emotion in ["희", "낙", "애(사랑)"]:
                  messages.append({"role": "user", "content": f"{user_text}\n(사용자가 '{top_emotion}' 감정을 느끼고 있습니다. 어떤 상황인지 구체적으로 질문하며 공감해주세요.)"})
@@ -120,7 +120,7 @@ async def chat():
         if needs_web_search:
             functions = [{
                 "name": "web_search",
-                "description": "키워드로 웹에서 검색하여 URL 리스트를 반환합니다.",
+                "description": "주어진 감정에 따라 감정 완화에 적합한 YouTube 영상 또는 음악 URL 3개를 반환합니다.",
                 "parameters": {
                     "type": "object",
                     "properties": {

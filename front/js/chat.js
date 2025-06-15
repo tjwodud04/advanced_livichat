@@ -367,19 +367,24 @@ function updateLipSync() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     console.log('Initializing application...');  // 애플리케이션 초기화 시작 메시지
     live2dManager = new Live2DManager();  // Live2D 관리자 생성
     audioManager = new AudioManager();    // 오디오 관리자 생성
     chatManager = new ChatManager('kei');  // 채팅 관리자 생성, 'kei' 캐릭터 설정
 
-    live2dManager.initialize();  // Live2D 관리자 초기화
+    await live2dManager.initialize();  // Live2D 관리자 초기화 (모델 로드 완료까지 대기)
 
-    const recordButton = document.getElementById('recordButton');  // 녹음 버튼 DOM 요소 가져오기
-    recordButton.addEventListener('click', handleRecording);  // 녹음 버튼 클릭 이벤트 핸들러 등록
+    // 캐릭터 로드 후 0.7초 뒤 안내 멘트 추가
+    setTimeout(() => {
+        chatManager.addMessage('ai', '만나서 반가워요. 지금 느끼는 감정이 어떤지 들려줘요.');
+    }, 700);
 
-    setInterval(updateLipSync, 50);  // 50ms마다 립싱크 업데이트
-    console.log('Application initialization completed');  // 애플리케이션 초기화 완료 메시지
+    const recordButton = document.getElementById('recordButton');
+    recordButton.addEventListener('click', handleRecording);
+
+    setInterval(updateLipSync, 50);
+    console.log('Application initialization completed');
 });
 
 // 녹음 버튼 클릭 시 동작
