@@ -9,7 +9,9 @@ import datetime
 from flask import Flask, request, jsonify, abort, render_template
 from flask_cors import CORS
 from openai import AsyncOpenAI
-from scripts.audio_util import convert_webm_to_pcm16
+
+VERCEL_TOKEN = os.getenv("VERCEL_TOKEN")
+VERCEL_PROJ_ID = os.getenv("VERCEL_PROJECT_ID")
 
 app = Flask(
     __name__,
@@ -19,11 +21,6 @@ app = Flask(
 )
 CORS(app)
 
-# --- 환경 변수 ---
-VERCEL_TOKEN = os.getenv("VERCEL_TOKEN")
-VERCEL_PROJ_ID = os.getenv("VERCEL_PROJECT_ID")
-BLOB_URL = os.environ.get('BLOB_URL') # 기존 로그 방식용 URL
-BLOB_API_TOKEN = os.environ.get('BLOB_API_TOKEN')
 
 # --- 캐릭터 페르소나 ---
 CHARACTER_PROMPTS = {
@@ -145,7 +142,7 @@ async def chat():
                 conversation_history[:] = conversation_history[-HISTORY_MAX_LEN:]
         
         log_data = {
-            "timestamp": datetime.datetime.isoformat() + "Z",
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
             "character": character, "user_text": user_text, "emotion_percent": emotion_percent,
             "top_emotion": top_emotion, "ai_text": ai_text
         }
