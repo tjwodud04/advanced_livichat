@@ -115,19 +115,33 @@ async def chat():
                  messages.append({"role": "user", "content": user_text})
 
 
-        # API 호출 (웹 검색 옵션 포함)
-        tools = [{"type": "web_search"}] if needs_web_search else None
-        
+        # 함수 정의 (Function Calling)
+        functions = None
+        if needs_web_search:
+            functions = [{
+                "name": "web_search",
+                "description": "키워드로 웹에서 검색하여 URL 리스트를 반환합니다.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string"}
+                    },
+                    "required": ["query"]
+                }
+            }]
+
+        # Chat + Audio Preview 호출
         response = await client.chat.completions.create(
             model="gpt-4o-audio-preview",
             modalities=["text", "audio"],
-            audio={"voice": {"kei": "alloy", "haru": "nova"}.get(character, "alloy"), "format": "wav"},
+            audio={"voice": character, "format": "wav"},
             messages=messages,
-            tools=tools,
-            tool_choice="auto" if tools else None,
+            functions=functions,
+            function_call="auto" if functions else None,
             temperature=0.7,
-            max_tokens=512
+            max_tokens=512,
         )
+
         msg = response.choices[0].message
         
         # 모델이 웹 검색을 사용하면, 별도 처리 없이 최종 답변이 msg.content에 포함됨
