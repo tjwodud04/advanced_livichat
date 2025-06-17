@@ -74,6 +74,18 @@ def remove_source_links(text):
     text = re.sub(r'\s{2,}', ' ', text)
     return text.strip()
 
+def extract_links(text):
+    # 마크다운 링크 추출
+    links = re.findall(r'\[.*?\]\((https?://[^\)]+)\)', text)
+    # 마크다운 링크 제거
+    text_wo_links = re.sub(r'\[.*?\]\((https?://[^\)]+)\)', '', text)
+    return text_wo_links.strip(), links
+
+def format_links(links):
+    if not links:
+        return ""
+    return "\n" + "\n".join([f"링크: {url}" for url in links])
+
 # --- Flask Routes ---
 
 @app.route('/')
@@ -133,6 +145,8 @@ async def chat():
             ai_text = search_response.choices[0].message.content or ""
 
             # 2차: 텍스트 답변을 음성으로 변환
+            text_wo_links, links = extract_links(ai_text)
+            ai_text = text_wo_links + format_links(links)
             audio_response = await client.chat.completions.create(
                 model="gpt-4o-audio-preview",
                 modalities=["text", "audio"],
@@ -144,6 +158,7 @@ async def chat():
                 temperature=0.7,
                 max_tokens=512,
             )
+            print(audio_response)
             # audio_b64 = audio_response.choices[0].message.audio.data if audio_response.choices[0].message.audio else ""
             audio_b64 = audio_response.choices[0].message.audio.data
             
