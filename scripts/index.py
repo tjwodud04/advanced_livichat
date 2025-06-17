@@ -235,6 +235,10 @@ async def chat():
                     else:
                         youtube_link = None
 
+            # ai_text에 추천 링크가 포함되어 있지 않으면 하단에 추가
+            if youtube_link and youtube_link not in ai_text:
+                ai_text += f'<br><a href="{youtube_link}" target="_blank">▶️ 추천 음악 바로 듣기</a>'
+
         else:
             # 비검색 분기: user_prompt 생성
             if top_emotion in ["희", "낙", "애(사랑)"]:
@@ -285,6 +289,10 @@ async def chat():
                         _, youtube_link = random.choice(candidates)
                     else:
                         youtube_link = None
+
+            # ai_text에 추천 링크가 포함되어 있지 않으면 하단에 추가
+            if youtube_link and youtube_link not in ai_text:
+                ai_text += f'<br><a href="{youtube_link}" target="_blank">▶️ 추천 음악 바로 듣기</a>'
 
         # 4. 대화 기록 갱신 및 로그 저장
         with history_lock:
