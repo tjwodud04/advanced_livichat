@@ -145,10 +145,10 @@ async def chat():
             ai_text = content
             link_list = []
             for ann in annotations:
-                if ann.get("type") == "url_citation":
-                    url = ann["url_citation"]["url"]
-                    start = ann["url_citation"]["start_index"]
-                    end = ann["url_citation"]["end_index"]
+                if getattr(ann, "type", None) == "url_citation":
+                    url = ann.url_citation.url
+                    start = ann.url_citation.start_index
+                    end = ann.url_citation.end_index
                     link_text = content[start:end]
                     a_tag = f'<a href="{url}" target="_blank">{link_text}</a>'
                     ai_text = ai_text[:start] + a_tag + ai_text[end:]
@@ -157,9 +157,9 @@ async def chat():
             tts_text = content
             offset = 0
             for ann in annotations:
-                if ann.get("type") == "url_citation":
-                    start = ann["url_citation"]["start_index"] - offset
-                    end = ann["url_citation"]["end_index"] - offset
+                if getattr(ann, "type", None) == "url_citation":
+                    start = ann.url_citation.start_index - offset
+                    end = ann.url_citation.end_index - offset
                     tts_text = tts_text[:start] + tts_text[end:]
                     offset += (end - start)
             tts_text = tts_text.strip()
