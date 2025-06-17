@@ -66,49 +66,12 @@ def upload_log_to_vercel_blob(blob_name: str, data: dict):
     except Exception as e:
         print(f"Vercel Blob 로그 업로드 예외: {e}")
 
-def remove_source_links(text):
-    # 마크다운 링크 [텍스트](URL) 제거
-    text = re.sub(r'\[.*?\]\(.*?\)', '', text)
-    # 괄호로 된 URL/출처 제거 (예: (https://...))
-    text = re.sub(r'\(https?:\/\/[^\)]*\)', '', text)
-    # 남은 이중 공백 정리
-    text = re.sub(r'\s{2,}', ' ', text)
-    return text.strip()
-
-def extract_links(text):
-    # 마크다운 링크 추출
-    links = re.findall(r'\[.*?\]\((https?://[^\)]+)\)', text)
-    # 마크다운 링크 제거
-    text_wo_links = re.sub(r'\[.*?\]\((https?://[^\)]+)\)', '', text)
-    return text_wo_links.strip(), links
-
-def format_links(links):
-    if not links:
-        return ""
-    return "\n" + "\n".join([f"링크: {url}" for url in links])
-
 def remove_empty_parentheses(text):
     return re.sub(r'\(\s*\)', '', text)
 
-def clean_url(url):
-    parsed = urlparse(url)
-    # 쿼리스트링 제거
-    return urlunparse(parsed._replace(query=""))
-
-def remove_utm_from_text(text):
-    # 마크다운 링크 또는 일반 URL 추출
-    urls = re.findall(r'(https?://[^\s\)]+)', text)
-    for url in urls:
-        clean = clean_url(url)
-        text = text.replace(url, clean)
-    return text
-
 def prettify_message(text):
-    text = remove_utm_from_text(text)
     text = remove_empty_parentheses(text)
-    # 불필요한 공백 정리
     text = re.sub(r'\s{2,}', ' ', text)
-    # 링크는 항상 줄바꿈해서 붙이기
     text = re.sub(r'링크:\s*', '\n링크: ', text)
     return text.strip()
 
@@ -162,31 +125,38 @@ async def chat():
         audio_b64 = ""
 
         if needs_web_search:
-            user_prompt = f"{user_text}\n(사용자가 '{top_emotion}' 감정을 느끼고 있습니다. 따뜻한 위로의 말과 함께 웹 검색을 사용해 관련된 위로가 되는 YouTube 영상 또는 음악 URL을 찾아 제안해주세요.)\n아래와 같은 구조로 2~3문장 이내로 답변하세요:\n1. 공감의 한마디\n2. 상황에 어울리는 제안(이럴 때는 ~ 어떤가요?)\n3. 제안에 대한 간단한 설명"
+            user_prompt = f"{user_text}\n(사용자가 '{top_emotion}' 감정을 느끼고 있습니다. 따뜻한 위로의 말과 함께 웹 검색을 사용해 관련된 위로가 되는 유튜브 음악 URL을 찾아 제안해주세요.)\n아래와 같은 구조로 2~3문장 이내로 답변하세요:\n1. 공감의 한마디\n2. 상황에 어울리는 제안(이럴 때는 ~ 어떤가요?)\n3. 제안에 대한 간단한 설명"
             messages.append({"role": "user", "content": user_prompt})
-            # 1차: 웹 검색 + 텍스트 답변 생성
             search_response = await client.chat.completions.create(
                 model="gpt-4o-search-preview",
                 messages=messages,
             )
             ai_text = search_response.choices[0].message.content or ""
-
-            # 2차: 텍스트 답변을 음성으로 변환
-            text_wo_links, links = extract_links(ai_text)
-            ai_text = text_wo_links + format_links(links)
+            # 유튜브 링크만 추출
+            youtube_link = None
+            for line in ai_text.splitlines():
+                if 'youtube.com' in line or 'youtu.be' in line:
+                    youtube_link = line.strip()
+                    break
+            # 음성 변환용 텍스트(링크 제거)
+            text_wo_links = re.sub(r'링크:.*', '', ai_text).strip()
             audio_response = await client.chat.completions.create(
                 model="gpt-4o-audio-preview",
                 modalities=["text", "audio"],
                 audio={"voice": CHARACTER_VOICE.get(character, "nova"), "format": "wav"},
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "assistant", "content": ai_text}
+                    {"role": "assistant", "content": text_wo_links}
                 ],
                 temperature=0.7,
                 max_tokens=512,
             )
-            print(audio_response)
             audio_b64 = audio_response.choices[0].message.audio.data
+            # ai_text는 유튜브 링크만 남기고, 나머지 링크 제거
+            if youtube_link:
+                ai_text = text_wo_links + f"\n링크: {youtube_link}"
+            else:
+                ai_text = text_wo_links
         else:
             if top_emotion in ["희", "낙", "애(사랑)"]:
                 user_prompt = f"{user_text}\n(사용자가 '{top_emotion}' 감정을 느끼고 있습니다. 어떤 상황인지 구체적으로 질문하며 공감해주세요.)\n아래와 같은 구조로 2~3문장 이내로 답변하세요:\n1. 공감의 한마디\n2. 상황에 어울리는 제안(이럴 때는 ~ 어떤가요?)\n3. 제안에 대한 간단한 설명"
@@ -203,12 +173,21 @@ async def chat():
                 temperature=0.7,
                 max_tokens=512,
             )
-            print("OpenAI 응답:", response.choices[0].message)
             ai_text = response.choices[0].message.content
-            print(ai_text)
+            # 유튜브 링크만 추출
+            youtube_link = None
+            for line in ai_text.splitlines():
+                if 'youtube.com' in line or 'youtu.be' in line:
+                    youtube_link = line.strip()
+                    break
+            text_wo_links = re.sub(r'링크:.*', '', ai_text).strip()
             if not ai_text or ai_text.strip() == "":
                 ai_text = "아직 답변을 준비하지 못했어요. 다시 한 번 말씀해주시겠어요?"
             audio_b64 = response.choices[0].message.audio.data
+            if youtube_link:
+                ai_text = text_wo_links + f"\n링크: {youtube_link}"
+            else:
+                ai_text = text_wo_links
 
         # 4. 대화 기록 갱신 및 로그 저장
         with history_lock:
@@ -227,7 +206,7 @@ async def chat():
         asyncio.create_task(asyncio.to_thread(upload_log_to_vercel_blob, blob_name, log_data))
 
         # 5. 최종 응답
-        ai_text = remove_source_links(ai_text)
+        ai_text = remove_empty_parentheses(ai_text)
         return jsonify({
             "user_text": user_text, "ai_text": ai_text, "audio": audio_b64,
             "emotion_percent": emotion_percent, "top_emotion": top_emotion

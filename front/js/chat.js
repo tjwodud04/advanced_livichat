@@ -281,7 +281,18 @@ class ChatManager {
 
         const content = document.createElement('div');  // 콘텐츠 요소 생성
         content.className = 'message-content';  // 콘텐츠 클래스 설정
-        content.textContent = message;  // 콘텐츠 텍스트 설정
+        // 링크 자동 변환 (ai 메시지에만 적용)
+        if (role === 'ai') {
+            // '링크: '로 시작하는 줄을 <a> 태그로 변환
+            let html = message.replace(/링크: (https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be)[^\s]*)/g, function(match, url) {
+                return `<a href="${url}" target="_blank">${url}</a>`;
+            });
+            // 줄바꿈 처리
+            html = html.replace(/\n/g, '<br>');
+            content.innerHTML = html;
+        } else {
+            content.textContent = message;
+        }
 
         const time = document.createElement('span');  // 시간 요소 생성
         time.className = 'message-time';  // 시간 클래스 설정
