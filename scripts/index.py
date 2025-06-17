@@ -6,6 +6,7 @@ import json
 import requests
 import datetime
 import re
+import random
 
 from flask import Flask, request, jsonify, abort, render_template
 from flask_cors import CORS
@@ -39,6 +40,44 @@ CHARACTER_VOICE = {
 conversation_history = []
 history_lock = threading.Lock()
 HISTORY_MAX_LEN = 10
+
+EMOTION_LINKS = {
+    "노": [
+        ("마음이 편안해지는 음악", "https://www.youtube.com/watch?v=5qap5aO4i9A"),
+        ("분노 해소 명상", "https://www.youtube.com/watch?v=O-6f5wQXSu8"),
+        ("스트레스 해소 ASMR", "https://www.youtube.com/watch?v=1ZYbU82GVz4"),
+    ],
+    "애": [
+        ("위로가 되는 노래", "https://www.youtube.com/watch?v=8UVNT4wvIGY"),
+        ("감성적인 음악", "https://www.youtube.com/watch?v=VYOjWnS4cMY"),
+        ("마음을 어루만지는 발라드", "https://www.youtube.com/watch?v=2Vv-BfVoq4g"),
+    ],
+    "오": [
+        ("불안할 때 듣는 음악", "https://www.youtube.com/watch?v=1ZYbU82GVz4"),
+        ("마음을 진정시키는 소리", "https://www.youtube.com/watch?v=5qap5aO4i9A"),
+        ("힐링 자연 소리", "https://www.youtube.com/watch?v=DWcJFNfaw9c"),
+    ],
+    "희": [
+        ("기분 좋은 팝송", "https://www.youtube.com/watch?v=JGwWNGJdvx8"),
+        ("신나는 댄스곡", "https://www.youtube.com/watch?v=OPf0YbXqDm0"),
+        ("에너지 넘치는 음악", "https://www.youtube.com/watch?v=ktvTqknDobU"),
+    ],
+    "낙": [
+        ("여유로운 재즈", "https://www.youtube.com/watch?v=Dx5qFachd3A"),
+        ("행복한 분위기의 음악", "https://www.youtube.com/watch?v=ZbZSe6N_BXs"),
+        ("산뜻한 아침 음악", "https://www.youtube.com/watch?v=6JCLY0Rlx6Q"),
+    ],
+    "애(사랑)": [
+        ("달콤한 사랑 노래", "https://www.youtube.com/watch?v=450p7goxZqg"),
+        ("로맨틱 팝송", "https://www.youtube.com/watch?v=09R8_2nJtjg"),
+        ("사랑을 담은 발라드", "https://www.youtube.com/watch?v=RgKAFK5djSk"),
+    ],
+    "욕": [
+        ("힘이 되는 응원가", "https://www.youtube.com/watch?v=2vjPBrBU-TM"),
+        ("자신감을 북돋는 음악", "https://www.youtube.com/watch?v=QJO3ROT-A4E"),
+        ("용기를 주는 노래", "https://www.youtube.com/watch?v=K0ibBPhiaG0"),
+    ],
+}
 
 # --- Helper Functions ---
 def get_openai_client(api_key: str):
@@ -75,6 +114,12 @@ def prettify_message(text):
 def markdown_to_html_links(text):
     """[텍스트](URL) 형태의 마크다운 링크를 <a href="URL" target="_blank">텍스트</a>로 변환"""
     return re.sub(r'\[([^\]]+)\]\((https?://[^\)]+)\)', r'<a href="\2" target="_blank">\1</a>', text)
+
+def extract_first_markdown_url(text):
+    match = re.search(r'\[([^\]]+)\]\((https?://[^\)]+)\)', text)
+    if match:
+        return match.group(2)
+    return None
 
 # --- Flask Routes ---
 @app.route('/')
@@ -177,7 +222,18 @@ async def chat():
                 input=tts_text
             )
             audio_b64 = base64.b64encode(audio_response.content).decode()
-            youtube_link = link_list[0] if link_list else None
+            if link_list:
+                youtube_link = link_list[0]
+            else:
+                # 마크다운 링크에서 추출 시도
+                youtube_link = extract_first_markdown_url(content)
+                if not youtube_link:
+                    # 하드코딩 데이터에서 랜덤 추천
+                    candidates = EMOTION_LINKS.get(top_emotion, [])
+                    if candidates:
+                        _, youtube_link = random.choice(candidates)
+                    else:
+                        youtube_link = None
 
         else:
             # 비검색 분기: user_prompt 생성
@@ -217,7 +273,18 @@ async def chat():
             )
             ai_text = response.choices[0].message.content or ""
             audio_b64 = response.choices[0].message.audio.data
-            youtube_link = None
+            if link_list:
+                youtube_link = link_list[0]
+            else:
+                # 마크다운 링크에서 추출 시도
+                youtube_link = extract_first_markdown_url(content)
+                if not youtube_link:
+                    # 하드코딩 데이터에서 랜덤 추천
+                    candidates = EMOTION_LINKS.get(top_emotion, [])
+                    if candidates:
+                        _, youtube_link = random.choice(candidates)
+                    else:
+                        youtube_link = None
 
         # 4. 대화 기록 갱신 및 로그 저장
         with history_lock:
