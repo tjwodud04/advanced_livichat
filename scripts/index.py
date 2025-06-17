@@ -263,18 +263,17 @@ async def chat():
             # --- audio-preview ---
             audio_messages = [
                 {"role": "system", "content": system_prompt},
-                {"role": "system", "content": "아래 텍스트를 읽을 때, '링크:' 이후의 URL은 읽지 마세요."},
                 {"role": "user", "content": user_prompt}
             ]
             response = await client.chat.completions.create(
-                model="gpt-4o-mini-audio-preview",
+                model="gpt-4o-audio-preview",
                 modalities=["text", "audio"],
                 audio={"voice": CHARACTER_VOICE[character], "format": "wav"},
                 messages=audio_messages,
                 temperature=0.7,
                 max_tokens=512,
             )
-            ai_text = response.choices[0].message.content or ""
+            ai_text = response.choices[0].message.content
             audio_b64 = response.choices[0].message.audio.data
             youtube_link = None
 
