@@ -1,5 +1,5 @@
 from flask import render_template, request
-from services import process_chat
+from scripts.services import process_chat
 
 def register_routes(app):
     @app.route('/')

@@ -8,8 +8,8 @@ import random
 import re
 from flask import jsonify, abort
 from openai import AsyncOpenAI
-from config import VERCEL_TOKEN, VERCEL_PROJ_ID, CHARACTER_SYSTEM_PROMPTS, CHARACTER_VOICE, EMOTION_LINKS, HISTORY_MAX_LEN
-from utils import remove_empty_parentheses, markdown_to_html_links, extract_first_markdown_url
+from scripts.config import VERCEL_TOKEN, VERCEL_PROJ_ID, CHARACTER_SYSTEM_PROMPTS, CHARACTER_VOICE, EMOTION_LINKS, HISTORY_MAX_LEN
+from scripts.utils import remove_empty_parentheses, markdown_to_html_links, extract_first_markdown_url
 
 conversation_history = []
 history_lock = threading.Lock()
