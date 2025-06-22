@@ -9,7 +9,7 @@ import re
 from flask import jsonify, abort
 from openai import AsyncOpenAI
 from scripts.config import VERCEL_TOKEN, VERCEL_PROJ_ID, CHARACTER_SYSTEM_PROMPTS, CHARACTER_VOICE, EMOTION_LINKS, HISTORY_MAX_LEN
-from scripts.utils import remove_empty_parentheses, markdown_to_html_links, extract_first_markdown_url
+from scripts.utils import remove_empty_parentheses, markdown_to_html_links, extract_first_markdown_url, remove_emojis
 
 conversation_history = []
 history_lock = threading.Lock()
@@ -128,6 +128,7 @@ async def process_chat(request):
                     tts_text = tts_text[:start] + tts_text[end:]
                     offset += (end - start)
             tts_text = tts_text.strip()
+            tts_text = remove_emojis(tts_text)
 
             audio_response = await client.audio.speech.create(
                 model="gpt-4o-mini-tts",
@@ -167,6 +168,7 @@ async def process_chat(request):
                 ai_text = "아직 답변을 준비하지 못했어요. 다시 한 번 말씀해주시겠어요?"
 
             tts_text = re.sub(r'링크:.*', '', ai_text).strip()
+            tts_text = remove_emojis(tts_text)
 
             audio_response = await client.audio.speech.create(
                 model="gpt-4o-mini-tts",

@@ -30,7 +30,7 @@ This project demonstrates a character chat application using OpenAI's voice reco
 3. (For local execution) Run the server:
 
    ```bash
-   python scripts/index.py
+   python scripts/app.py
    ```
 
    - Default port: 8001
@@ -65,8 +65,11 @@ This project demonstrates a character chat application using OpenAI's voice reco
 │   ├── kei/ (Live2D model, sounds, etc.)
 │   └── haru/ (Live2D model, motions, etc.)
 ├── scripts/
-│   ├── index.py (Flask backend, OpenAI integration)
-│   └── voice_agent_core.py (audio processing)
+│   ├── app.py (Flask backend entry point)
+│   ├── routes.py (Flask routes)
+│   ├── services.py (OpenAI and Vercel integration)
+│   ├── utils.py (Utility functions)
+│   └── config.py (Configuration and constants)
 ├── requirements.txt
 ├── vercel.json
 ```
