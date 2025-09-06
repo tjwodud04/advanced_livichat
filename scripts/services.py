@@ -6,10 +6,15 @@ import requests
 import datetime
 import random
 import re
+import time
 from flask import jsonify, abort
 from openai import AsyncOpenAI
 from scripts.config import VERCEL_TOKEN, VERCEL_PROJ_ID, CHARACTER_SYSTEM_PROMPTS, CHARACTER_VOICE, EMOTION_LINKS, HISTORY_MAX_LEN
 from scripts.utils import remove_empty_parentheses, markdown_to_html_links, extract_first_markdown_url, remove_emojis
+from collections import deque
+from dataclasses import dataclass, field
+from typing import Deque, Dict, Any, List, Tuple, Literal
+
 
 conversation_history = []
 history_lock = threading.Lock()
@@ -214,3 +219,81 @@ async def process_chat(request):
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({"error": f"Failed to process request: {e}"}), 500 
+    
+
+# ---- 세션 상태 (전역 리스트 -> 세션 단기 상태) ----
+MAX_TURNS = 10
+
+@dataclass
+class _SessionState:
+    history: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=MAX_TURNS))
+    emotions: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=MAX_TURNS))
+    settings: Dict[str, Any] = field(default_factory=lambda: {"proactive": True, "frequency": "normal"})
+    last_proactive_ts: float = 0.0
+    last_user_utter_ts: float = 0.0
+
+class ProactiveSessionManager:
+    def __init__(self):
+        self._m: Dict[str, _SessionState] = {}
+    def get(self, sid: str) -> _SessionState:
+        if sid not in self._m: self._m[sid] = _SessionState()
+        return self._m[sid]
+    def upsert_turn(self, sid: str, role: str, text: str, meta: Dict[str, Any]):
+        st = self.get(sid); st.history.append({"role": role, "text": text, "meta": meta})
+        if role == "user": st.last_user_utter_ts = meta.get("ts", 0.0)
+    def push_emotion(self, sid: str, label: str, conf: float, intensity: float, ts: float):
+        st = self.get(sid); st.emotions.append({"label": label, "conf": conf, "intensity": intensity, "ts": ts})
+        st.last_user_utter_ts = ts
+
+SM = ProactiveSessionManager()
+
+# ---- 정책(트리거) ----
+Action = Literal["none","hint","assist","recommend"]
+DEFAULTS = {"sad_thr":0.5, "ang_thr":0.6, "silence_ms":15000, "cooldown_ms":45000}
+
+def _recent_emotion(st:_SessionState):
+    return st.emotions[-1] if st.emotions else None
+
+def should_proactively_suggest(sid:str, now:float=None) -> Tuple[Action,str]:
+    st = SM.get(sid)
+    if not st.settings.get("proactive", True): return "none","proactive disabled"
+    now = now or time.time()*1000
+    if now - st.last_proactive_ts < DEFAULTS["cooldown_ms"]: return "none","cooldown"
+    # 침묵
+    if st.last_user_utter_ts and (now - st.last_user_utter_ts) > DEFAULTS["silence_ms"]:
+        st.last_proactive_ts = now; return "hint","prolonged silence"
+    # 감정
+    emo = _recent_emotion(st)
+    if not emo: return "none","no emotion"
+    label, intensity = emo["label"], emo["intensity"]
+    if label=="sadness" and intensity>=DEFAULTS["sad_thr"]:
+        st.last_proactive_ts = now; return "recommend","sadness detected"
+    if label=="anger" and intensity>=DEFAULTS["ang_thr"]:
+        st.last_proactive_ts = now; return "assist","anger detected"
+    return "none","no policy hit"
+
+# ---- 간단 검색 → 제안 카드(1~2링크) ----
+def _search_preview(query:str) -> List[Dict[str,str]]:
+    # TODO: 실제 검색/URL 인용 API로 교체
+    return [
+        {"title":"Breathing Exercise (5m)", "url":"https://example.com/breathing"},
+        {"title":"Lo-fi playlist", "url":"https://example.com/lofi"}
+    ][:2]
+
+def build_suggestion_card(query:str, reason:str) -> Dict[str,Any]:
+    items = _search_preview(query)
+    return {
+        "type":"suggestion",
+        "title": items[0]["title"] if items else "Suggestion",
+        "reason": reason,
+        "url": items[0]["url"] if items else None,
+        "alt": items[1:] if len(items)>1 else []
+    }
+
+# ---- (선택) 짧은 이유 문구 ----
+def rationale_for(action:str, policy_reason:str)->str:
+    return {
+        "hint":"조용하셔서 가볍게 제안드려요.",
+        "assist":"답답함이 느껴져 도움이 될 만한 것을 가져왔어요.",
+        "recommend":"기분 전환에 도움이 될 수 있어요."
+    }.get(action, policy_reason)
