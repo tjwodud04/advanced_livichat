@@ -255,8 +255,8 @@ class ChatManager {
         content.className = 'message-content';
         if (role === 'ai') {
           // 안전 이스케이프 + 줄바꿈만 <br>로
-          const safe = _esc(message).replace(/\n/g, '<br>');
-          content.innerHTML = safe;
+          const safeHTML = _sanitizeHtml(message);
+          content.innerHTML = safeHTML;
           // 프로액티브 카드가 있으면 뒤에 HTML로 덧붙이기
           if (aiPayload?.proactive?.card) {
               const cardHTML = _renderSuggestion(aiPayload.proactive.card);
@@ -452,4 +452,42 @@ function _renderSuggestion(card){
         ${alt ? ` · ${alt}` : ""}
       </div>
     </div>`;
+}
+
+// [ADD] 허용 태그만 남기는 간단 Sanitizer: <a>, <br>만 허용
+function _sanitizeHtml(input) {
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = input || '';
+
+  const allowed = new Set(['A', 'BR']);
+
+  // 모든 요소 순회
+  const all = wrapper.querySelectorAll('*');
+  for (const el of all) {
+    const tag = el.tagName;
+    if (!allowed.has(tag)) {
+      // 허용 안 되는 태그는 텍스트만 남기고 제거
+      el.replaceWith(document.createTextNode(el.textContent || ''));
+      continue;
+    }
+    if (tag === 'A') {
+      // href만 허용, http(s)만 통과
+      const href = el.getAttribute('href') || '';
+      if (!/^https?:\/\//i.test(href)) {
+        el.replaceWith(document.createTextNode(el.textContent || ''));
+        continue;
+      }
+      // 보안 속성 강제
+      el.setAttribute('target', '_blank');
+      el.setAttribute('rel', 'noopener noreferrer');
+
+      // 나머지 속성 제거
+      for (const attr of [...el.attributes]) {
+        const name = attr.name.toLowerCase();
+        if (!['href', 'target', 'rel'].includes(name)) el.removeAttribute(attr.name);
+      }
+    }
+  }
+  // 개행 보정
+  return wrapper.innerHTML.replace(/\n/g, '<br>');
 }
