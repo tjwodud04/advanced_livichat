@@ -229,6 +229,7 @@ class ChatManager {
      * @param {'user'|'ai'|'system'} role
      * @param {string} message
      * @param {string|null} link  클릭 가능한 링크 (옵셔널)
+     * @param {object|null} aiPayload  전체 페이로드(프로액티브 카드 포함)
      */
     addMessage(role, message, link = null, aiPayload = null) {
         console.log(`Adding ${role} message:`, message);
@@ -254,17 +255,20 @@ class ChatManager {
         const content = document.createElement('div');
         content.className = 'message-content';
         if (role === 'ai') {
-          // 안전 이스케이프 + 줄바꿈만 <br>로
-          const safeHTML = _sanitizeHtml(message);
-          content.innerHTML = safeHTML;
-          // 프로액티브 카드가 있으면 뒤에 HTML로 덧붙이기
-          if (aiPayload?.proactive?.card) {
-              const cardHTML = _renderSuggestion(aiPayload.proactive.card);
-              if (cardHTML) content.insertAdjacentHTML('beforeend', cardHTML);
-          }
-      } else {
-          content.textContent = message;
-      }
+            const safeHTML = _sanitizeHtml(message);
+            content.innerHTML = safeHTML;
+            // 프로액티브 카드가 있으면 HTML로 덧붙이기
+            if (aiPayload?.proactive_card) {
+                const cardHTML = _renderSuggestion(aiPayload.proactive_card);
+                if (cardHTML) content.insertAdjacentHTML('beforeend', cardHTML);
+            } else if (aiPayload?.proactive?.card) {
+                // 호환: 다른 키로 내려오는 경우
+                const cardHTML = _renderSuggestion(aiPayload.proactive.card);
+                if (cardHTML) content.insertAdjacentHTML('beforeend', cardHTML);
+            }
+        } else {
+            content.textContent = message;
+        }
         messageBubble.appendChild(content);
 
         // (호환) 링크 문자열이 별도로 넘어오면 기존 방식 유지
@@ -297,9 +301,9 @@ class ChatManager {
             const formData = new FormData();
             formData.append('audio', audioBlob, 'audio.webm');
             formData.append('character', this.characterType);
-          
+
             const apiKey = localStorage.getItem('openai_api_key');
-            console.log('Sending request to server');
+            console.log('Sending request to server (once)');
             const response = await fetch('/scripts/chat', {
                 method: 'POST',
                 body: formData,
@@ -313,17 +317,17 @@ class ChatManager {
             }
 
             const data = await response.json();
-            console.log('Server response received:', data);  // 서버 응답 수신 메시지
-            return data;  // 데이터 반환
+            console.log('Server response received (once):', data);
+            return data;
         } catch (error) {
-            console.error('Server communication error:', error);  // 서버 통신 에러 출력
-            throw error;  // 에러 다시 발생
+            console.error('Server communication error:', error);
+            throw error;
         }
     }
 
     // 대화 기록 가져오기
     getConversationHistory() {
-        return this.conversationHistory;  // 대화 기록 배열 반환
+        return this.conversationHistory;
     }
 }
 
@@ -333,28 +337,27 @@ let chatManager;    // 채팅 관리자 전역 변수
 
 // 립싱크 업데이트 함수
 function updateLipSync() {
-    if (audioManager && audioManager.isRecording) {  // 오디오 관리자가 있고 녹음 중인 경우
-        const audioData = audioManager.getAudioData();  // 오디오 데이터 가져오기
-        let sum = 0;  // 합계 초기화
+    if (audioManager && audioManager.isRecording) {
+        const audioData = audioManager.getAudioData();
+        let sum = 0;
         for (let i = 0; i < audioData.length; i++) {
-            sum += Math.abs(audioData[i] - 128);  // 각 데이터와 128의 차이 절대값 합계
+            sum += Math.abs(audioData[i] - 128);
         }
-        const average = sum / audioData.length;  // 평균 계산
-        const normalizedValue = average / 128;  // 정규화된 값 계산
-
-        live2dManager.updateLipSync(normalizedValue);  // 립싱크 업데이트
+        const average = sum / audioData.length;
+        const normalizedValue = average / 128;
+        live2dManager.updateLipSync(normalizedValue);
     }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('Initializing application...');  // 애플리케이션 초기화 시작 메시지
-    live2dManager = new Live2DManager();  // Live2D 관리자 생성
-    audioManager = new AudioManager();    // 오디오 관리자 생성
-    chatManager = new ChatManager('kei');  // 채팅 관리자 생성, 'kei' 캐릭터 설정
+    console.log('Initializing application...');
+    live2dManager = new Live2DManager();
+    audioManager = new AudioManager();
+    chatManager = new ChatManager('kei');
 
-    await live2dManager.initialize();  // Live2D 관리자 초기화 (모델 로드 완료까지 대기)
+    await live2dManager.initialize();
 
-    // 캐릭터 로드 후 0.7초 뒤 안내 멘트 추가
+    // 캐릭터 로드 후 0.7초 뒤 안내 멘트
     setTimeout(() => {
         chatManager.addMessage('ai', '만나서 반가워요. 지금 느끼는 감정이 어떤지 들려줘요.');
     }, 700);
@@ -368,88 +371,163 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // 녹음 버튼 클릭 시 동작
 async function handleRecording() {
-    const recordButton = document.getElementById('recordButton');  // 녹음 버튼 DOM 요소 가져오기
+    const recordButton = document.getElementById('recordButton');
 
-    if (chatManager.isPlaying) {  // 오디오 재생 중인 경우
-        console.log('Cannot start recording while audio is playing');  // 녹음 시작 불가 메시지
-        return;  // 함수 종료
+    if (chatManager.isPlaying) {
+        console.log('Cannot start recording while audio is playing');
+        return;
     }
 
-    if (!audioManager.isRecording) {  // 녹음 중이 아닌 경우
-        console.log('Starting new recording');  // 새 녹음 시작 메시지
-        const started = await audioManager.startRecording();  // 녹음 시작
-        if (started) {  // 녹음 시작 성공한 경우
-            recordButton.textContent = '멈추기';  // 버튼 텍스트 변경
-            recordButton.classList.add('recording');  // 녹음 중 클래스 추가
-            live2dManager.setExpression('listening');  // 'listening' 표정 설정
+    if (!audioManager.isRecording) {
+        console.log('Starting new recording');
+        const started = await audioManager.startRecording();
+        if (started) {
+            recordButton.textContent = '멈추기';
+            recordButton.classList.add('recording');
+            live2dManager.setExpression('listening');
         }
-    } else {  // 녹음 중인 경우
-        console.log('Stopping recording and processing audio');  // 녹음 중지 및 오디오 처리 메시지
-        recordButton.disabled = true;  // 버튼 비활성화
-        recordButton.textContent = '처리 중...';  // 버튼 텍스트 변경
-        recordButton.classList.remove('recording');  // 녹음 중 클래스 제거
-        live2dManager.setExpression('neutral');  // 'neutral' 표정 설정
+    } else {
+        console.log('Stopping recording and processing audio');
+        recordButton.disabled = true;
+        recordButton.textContent = '처리 중...';
+        recordButton.classList.remove('recording');
+        live2dManager.setExpression('neutral');
 
         try {
-            const audioBlob = await audioManager.stopRecording();  // 녹음 중지 및 Blob 반환
-            if (!audioBlob) {  // Blob이 없는 경우
-                throw new Error('No audio data recorded');  // 에러 발생
+            const audioBlob = await audioManager.stopRecording();
+            if (!audioBlob) throw new Error('No audio data recorded');
+
+            console.log('Sending audio to server for processing');
+            let response;
+            try {
+                response = await sendAudioToServerStream(audioBlob, chatManager.characterType);
+            } catch (e) {
+                console.warn('stream failed, fallback to once:', e);
+                response = await chatManager.sendAudioToServer(audioBlob);
             }
 
-            console.log('Sending audio to server for processing');  // 서버 처리를 위한 오디오 전송 메시지
-            const response = await chatManager.sendAudioToServer(audioBlob);  // 서버로 오디오 전송 및 응답 대기
-            console.log('Received server response:', response);  // 서버 응답 수신 메시지
-
-            if (response.user_text) {  // 사용자 텍스트가 있는 경우
-                chatManager.addMessage('user', response.user_text);  // 사용자 메시지 추가
+            if (response.user_text) {
+                chatManager.addMessage('user', response.user_text);
             }
 
-             if (response.ai_text) {  // AI 텍스트가 있는 경우
-                // 4번째 인자로 전체 payload 전달 → addMessage가 카드까지 렌더
+            if (response.ai_text) {
+                // 4번째 인자로 전체 payload 전달 → 카드까지 렌더
                 chatManager.addMessage('ai', response.ai_text, null, response);
-                
-                if (response.audio) {  // 오디오가 있는 경우
-                    console.log('Starting audio playback');  // 오디오 재생 시작 메시지
-                    chatManager.isPlaying = true;  // 재생 중 플래그 설정
-                    live2dManager.setExpression('speaking');  // 'speaking' 표정 설정
+
+                if (response.audio) {
+                    console.log('Starting audio playback');
+                    chatManager.isPlaying = true;
+                    live2dManager.setExpression('speaking');
 
                     try {
-                        await live2dManager.playAudioWithLipSync(response.audio);  // 립싱크와 함께 오디오 재생
-                        console.log('Audio playback completed');  // 오디오 재생 완료 메시지
+                        await live2dManager.playAudioWithLipSync(response.audio);
+                        console.log('Audio playback completed');
                     } catch (error) {
-                        console.error('Playback error:', error);  // 재생 에러 출력
+                        console.error('Playback error:', error);
                     } finally {
-                        live2dManager.setExpression('neutral');  // 'neutral' 표정 설정
-                        chatManager.isPlaying = false;  // 재생 중 플래그 해제
+                        live2dManager.setExpression('neutral');
+                        chatManager.isPlaying = false;
                     }
                 }
             }
         } catch (error) {
-            console.error('Error processing recording:', error);  // 녹음 처리 에러 출력
-            chatManager.addMessage('system', '오류가 발생했습니다. 다시 시도해주세요.');  // 시스템 에러 메시지 추가
+            console.error('Error processing recording:', error);
+            chatManager.addMessage('system', '오류가 발생했습니다. 다시 시도해주세요.');
         } finally {
-            live2dManager.setExpression('neutral');  // 'neutral' 표정 설정
-            chatManager.isPlaying = false;  // 재생 중 플래그 해제
-            recordButton.disabled = false;  // 버튼 활성화
-            recordButton.textContent = '이야기하기';  // 버튼 텍스트 변경
+            live2dManager.setExpression('neutral');
+            chatManager.isPlaying = false;
+            recordButton.disabled = false;
+            recordButton.textContent = '이야기하기';
         }
     }
+}
+
+// ====== 스트리밍 송수신: /scripts/chat_stream ======
+async function sendAudioToServerStream(audioBlob, characterType = 'kei') {
+  const apiKey = localStorage.getItem('openai_api_key') || '';
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'audio.webm');
+  formData.append('character', characterType);
+
+  const resp = await fetch('/scripts/chat_stream', {
+    method: 'POST',
+    headers: { 'X-API-KEY': apiKey },
+    body: formData
+  });
+
+  if (!resp.ok || !resp.body) {
+    throw new Error(`stream failed: ${resp.status}`);
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let finalPayload = null;
+
+  // 최초 토큰 수신 시 AI 말풍선 뼈대
+  let hasSkeleton = false;
+  let skeletonEl = null;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    let idx;
+    while ((idx = buffer.indexOf('\n\n')) >= 0) {
+      const chunk = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 2);
+
+      // SSE 포맷: "event: token" + "data: {...}"
+      const lines = chunk.split('\n');
+      const ev = (lines.find(l => l.startsWith('event:')) || '').slice(6).trim();
+      const dataLine = (lines.find(l => l.startsWith('data:')) || '').slice(5).trim();
+
+      if (!ev || !dataLine) continue;
+
+      if (ev === 'token') {
+        const { token } = JSON.parse(dataLine);
+        if (!hasSkeleton) {
+          chatManager.addMessage('ai', '', null, null);
+          skeletonEl = chatManager.chatHistory.lastElementChild.querySelector('.message-content');
+          hasSkeleton = true;
+        }
+        if (skeletonEl) {
+          const safe = _sanitizeHtml((skeletonEl.innerHTML || '') + token);
+          skeletonEl.innerHTML = safe;
+          chatManager.chatHistory.scrollTop = chatManager.chatHistory.scrollHeight;
+        }
+      } else if (ev === 'final') {
+        finalPayload = JSON.parse(dataLine);
+      }
+    }
+  }
+
+  if (!finalPayload) throw new Error('no final payload from stream');
+  return finalPayload;
 }
 
 // [ADD] 안전한 HTML 이스케이프
 function _esc(s){return (s||"").replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
 
-// [ADD] 제안 카드 HTML
+// [ADD] 제안 카드 HTML (수용/거절 버튼 포함)
 function _renderSuggestion(card){
   if(!card) return "";
   const alt = (card.alt||[]).map(x=>`<a href="${x.url}" target="_blank" rel="noopener">${_esc(x.title)}</a>`).join(" · ");
+  const type = _esc(card.type || 'info');
   return `
     <div class="suggestion-card">
       <div class="suggestion-title">${_esc(card.title || "Suggestion")}</div>
       ${card.reason ? `<div class="suggestion-meta">${_esc(card.reason)}</div>` : ""}
+
       <div class="suggestion-actions">
         ${card.url ? `<a href="${card.url}" target="_blank" rel="noopener"><span class="play"></span> 추천 음악 바로 듣기</a>` : ""}
         ${alt ? ` · ${alt}` : ""}
+      </div>
+
+      <div class="suggestion-feedback">
+        <button class="s-accept" data-type="${type}">도움돼요</button>
+        <button class="s-reject" data-type="${type}">괜찮아요</button>
       </div>
     </div>`;
 }
@@ -461,33 +539,46 @@ function _sanitizeHtml(input) {
 
   const allowed = new Set(['A', 'BR']);
 
-  // 모든 요소 순회
   const all = wrapper.querySelectorAll('*');
   for (const el of all) {
     const tag = el.tagName;
     if (!allowed.has(tag)) {
-      // 허용 안 되는 태그는 텍스트만 남기고 제거
       el.replaceWith(document.createTextNode(el.textContent || ''));
       continue;
     }
     if (tag === 'A') {
-      // href만 허용, http(s)만 통과
       const href = el.getAttribute('href') || '';
       if (!/^https?:\/\//i.test(href)) {
         el.replaceWith(document.createTextNode(el.textContent || ''));
         continue;
       }
-      // 보안 속성 강제
       el.setAttribute('target', '_blank');
       el.setAttribute('rel', 'noopener noreferrer');
-
-      // 나머지 속성 제거
       for (const attr of [...el.attributes]) {
         const name = attr.name.toLowerCase();
         if (!['href', 'target', 'rel'].includes(name)) el.removeAttribute(attr.name);
       }
     }
   }
-  // 개행 보정
   return wrapper.innerHTML.replace(/\n/g, '<br>');
 }
+
+// [ADD] 프로액티브 카드 피드백 전송 (이벤트 위임)
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('.suggestion-feedback button');
+  if(!btn) return;
+  const accepted = btn.classList.contains('s-accept');
+  const sType = btn.getAttribute('data-type') || 'info';
+
+  try{
+    await fetch('/proactive/feedback', {
+      method:'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        session_id: 'default-session',   // 세션 ID를 별도로 관리한다면 교체
+        suggestion_type: sType,
+        accepted
+      })
+    });
+  }catch(err){ console.warn('feedback send fail', err); }
+});
